@@ -1,0 +1,21 @@
+# aishelf scraper — example authors config.
+# Copy to authors.yaml (gitignored) and edit.
+
+accounts:
+  - platform: youtube
+    id: UCSHZKyawb77ixDdsGog4iWA       # 也可填 URL 或 @handle,启动时自动归一化
+    display_name: Lex Fridman
+    enabled: true
+    note: AI 访谈主战场
+
+  - platform: bilibili
+    id: "12345678"                      # 也可填 https://space.bilibili.com/12345678
+    display_name: 某 AI UP 主
+    enabled: true
+
+defaults:
+  language_hint: null                   # Whisper 语种提示;null = 自动检测
+  max_videos_per_account: 50
+  request_timeout_seconds: 30
+  min_delay_between_requests_seconds: 1.0
+  youtube_api_quota_aware: false        # 预留,首版不实现
