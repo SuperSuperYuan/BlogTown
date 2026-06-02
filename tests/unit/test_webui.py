@@ -1,3 +1,11 @@
+import json
+from types import SimpleNamespace
+
+import httpx
+from fastapi.testclient import TestClient
+from openai import APIConnectionError
+
+from aishelf.webui import app as webui_app
 from aishelf.webui import config
 
 
@@ -18,17 +26,6 @@ def test_get_settings_env_override(monkeypatch):
     assert s == {"base_url": "http://example/v1", "api_key": "k", "model": "m"}
 
 
-import json
-from types import SimpleNamespace
-
-import httpx
-import pytest
-from fastapi.testclient import TestClient
-from openai import APIConnectionError, APIStatusError
-
-from aishelf.webui import app as webui_app
-
-
 def _chunk(content):
     """Fake an OpenAI streaming chunk with one choice delta."""
     delta = SimpleNamespace(content=content)
@@ -40,8 +37,10 @@ class _FakeCompletions:
     def __init__(self, chunks=None, exc=None):
         self._chunks = chunks or []
         self._exc = exc
+        self.last_kwargs = None
 
     def create(self, **kwargs):
+        self.last_kwargs = kwargs
         if self._exc is not None:
             raise self._exc
         return iter(self._chunks)
@@ -49,7 +48,8 @@ class _FakeCompletions:
 
 class _FakeClient:
     def __init__(self, chunks=None, exc=None):
-        self.chat = SimpleNamespace(completions=_FakeCompletions(chunks, exc))
+        self.completions = _FakeCompletions(chunks, exc)
+        self.chat = SimpleNamespace(completions=self.completions)
 
 
 def _events(resp):
@@ -79,6 +79,22 @@ def test_chat_streams_deltas(monkeypatch):
     assert {"done": True} in events
     # the None-content chunk must NOT produce a delta event
     assert {"delta": None} not in events
+
+
+def test_chat_forwards_full_history(monkeypatch):
+    fake = _FakeClient(chunks=[_chunk("ok")])
+    monkeypatch.setattr(webui_app, "get_client", lambda: fake)
+    client = TestClient(webui_app.app)
+    history = [
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "reply"},
+        {"role": "user", "content": "second"},
+    ]
+    resp = client.post("/api/chat", json={"messages": history})
+    assert resp.status_code == 200
+    # the whole conversation is forwarded to Hermes, in order
+    assert fake.completions.last_kwargs["messages"] == history
+    assert fake.completions.last_kwargs["stream"] is True
 
 
 def test_chat_connection_error(monkeypatch):
