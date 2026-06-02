@@ -3,5 +3,16 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
-data/*.json
 .DS_Store
+.idea/
+.claude/
+
+# aishelf runtime artifacts
+config/authors.yaml
+data/
+downloads/
+
+# Python packaging
+*.egg-info/
+build/
+dist/
