@@ -46,7 +46,9 @@ def load_items(data_dir) -> list[ContentItem]:
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
                 items.append(parse_item(raw))
-            except (json.JSONDecodeError, ValidationError, OSError) as exc:
+            # ValueError covers malformed JSON (JSONDecodeError) and bad UTF-8
+            # bytes (UnicodeDecodeError); ValidationError covers schema failures.
+            except (ValidationError, ValueError, OSError) as exc:
                 logger.warning("skipping invalid content file %s: %s", path, exc)
                 continue
     items.sort(key=lambda it: _parse_dt(it.published_at), reverse=True)

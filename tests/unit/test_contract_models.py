@@ -46,10 +46,19 @@ def test_parse_blog_returns_blogitem():
     assert item.keywords == []
 
 
-def test_video_optional_fields_default_none():
+def test_blog_optional_fields_default_none():
     item = parse_item(BLOG)
     assert item.cover_image_url is None
     assert item.site_name is None
+    assert item.author_id is None
+
+
+def test_video_optional_fields_default_none():
+    minimal = {k: v for k, v in VIDEO.items() if k != "duration_seconds"}
+    item = parse_item(minimal)
+    assert item.duration_seconds is None
+    assert item.embed_url is None
+    assert item.author_id is None
 
 
 def test_missing_required_field_raises():
