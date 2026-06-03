@@ -1,0 +1,220 @@
+{
+  "$defs": {
+    "BlogItem": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "blog",
+          "default": "blog",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "source_url": {
+          "title": "Source Url",
+          "type": "string"
+        },
+        "published_at": {
+          "title": "Published At",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "collected_at": {
+          "title": "Collected At",
+          "type": "string"
+        },
+        "cover_image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cover Image Url"
+        },
+        "site_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Site Name"
+        },
+        "author_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author Id"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "author",
+        "platform",
+        "source_url",
+        "published_at",
+        "summary",
+        "keywords",
+        "collected_at"
+      ],
+      "title": "BlogItem",
+      "type": "object"
+    },
+    "VideoItem": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "video",
+          "default": "video",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "source_url": {
+          "title": "Source Url",
+          "type": "string"
+        },
+        "published_at": {
+          "title": "Published At",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "collected_at": {
+          "title": "Collected At",
+          "type": "string"
+        },
+        "thumbnail_url": {
+          "title": "Thumbnail Url",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Seconds"
+        },
+        "embed_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embed Url"
+        },
+        "author_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author Id"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "author",
+        "platform",
+        "source_url",
+        "published_at",
+        "summary",
+        "keywords",
+        "collected_at",
+        "thumbnail_url"
+      ],
+      "title": "VideoItem",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "blog": "#/$defs/BlogItem",
+      "video": "#/$defs/VideoItem"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/VideoItem"
+    },
+    {
+      "$ref": "#/$defs/BlogItem"
+    }
+  ]
+}
