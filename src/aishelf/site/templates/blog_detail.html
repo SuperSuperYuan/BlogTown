@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} · aishelf{% endblock %}
+{% block content %}
+<article class="detail">
+  {% if item.cover_image_url %}<img class="cover-lg" src="{{ item.cover_image_url }}" alt="" />{% endif %}
+  <h1>{{ item.title }}</h1>
+  <div class="sub"><a href="/authors/{{ (item.author_id or item.author)|urlencode }}">{{ item.author }}</a> · {{ item.published_at[:10] }}{% if item.site_name %} · {{ item.site_name }}{% endif %}</div>
+  <p class="summary">{{ item.summary }}</p>
+  <p><a class="btn" href="{{ item.source_url }}" target="_blank" rel="noopener">阅读全文(原站) →</a></p>
+  {% include "_keywords.html" %}
+</article>
+{% endblock %}

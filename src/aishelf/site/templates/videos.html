@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}视频 · aishelf{% endblock %}
+{% block content %}
+<h1>视频{% if keyword %} · 关键词「{{ keyword }}」{% endif %}{% if q %} · 搜索「{{ q }}」{% endif %}</h1>
+{% if page.total == 0 %}<p class="empty">暂无内容</p>
+{% else %}<div class="grid">{% for it in page.items %}{% include "_video_card.html" %}{% endfor %}</div>
+{% include "_pager.html" %}{% endif %}
+{% endblock %}

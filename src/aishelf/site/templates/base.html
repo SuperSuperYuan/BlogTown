@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}aishelf{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">aishelf</a>
+    <nav><a href="/videos">视频</a><a href="/blogs">博客</a></nav>
+    <form class="search" action="/search" method="get">
+      <input name="q" placeholder="搜索标题/摘要/关键词" value="{{ q|default('') }}" />
+      <button type="submit">搜索</button>
+    </form>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

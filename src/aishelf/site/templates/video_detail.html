@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} · aishelf{% endblock %}
+{% block content %}
+<article class="detail">
+  <h1>{{ item.title }}</h1>
+  <div class="sub"><a href="/authors/{{ (item.author_id or item.author)|urlencode }}">{{ item.author }}</a> · {{ item.published_at[:10] }} · {{ item.platform }}</div>
+  {% if item.embed_url %}
+  <div class="player"><iframe src="{{ item.embed_url }}" frameborder="0" allowfullscreen></iframe></div>
+  {% else %}
+  <a class="poster" href="{{ item.source_url }}" target="_blank" rel="noopener"><img src="{{ item.thumbnail_url }}" alt="" /></a>
+  <p><a class="btn" href="{{ item.source_url }}" target="_blank" rel="noopener">去原站观看 →</a></p>
+  {% endif %}
+  <p class="summary">{{ item.summary }}</p>
+  {% include "_keywords.html" %}
+</article>
+{% endblock %}
