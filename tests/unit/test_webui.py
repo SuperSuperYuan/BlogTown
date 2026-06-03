@@ -81,6 +81,26 @@ def test_chat_streams_deltas(monkeypatch):
     assert {"delta": None} not in events
 
 
+def test_chat_skips_chunks_without_choices(monkeypatch):
+    # Some OpenAI-compatible servers (Hermes) emit a trailing chunk whose
+    # `choices` is None (or empty) — e.g. a usage/keep-alive chunk. The stream
+    # must skip these, not crash, and still deliver the real deltas + done.
+    none_chunk = SimpleNamespace(choices=None)
+    empty_chunk = SimpleNamespace(choices=[])
+    fake = _FakeClient(
+        chunks=[_chunk("Hi"), none_chunk, empty_chunk, _chunk(" there"), _chunk(None)]
+    )
+    monkeypatch.setattr(webui_app, "get_client", lambda: fake)
+    client = TestClient(webui_app.app)
+    resp = _post(client)
+    assert resp.status_code == 200
+    events = _events(resp)
+    assert {"delta": "Hi"} in events
+    assert {"delta": " there"} in events
+    assert {"done": True} in events
+    assert not any("error" in e for e in events)
+
+
 def test_chat_forwards_full_history(monkeypatch):
     fake = _FakeClient(chunks=[_chunk("ok")])
     monkeypatch.setattr(webui_app, "get_client", lambda: fake)

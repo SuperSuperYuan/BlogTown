@@ -1,0 +1,13 @@
+{
+  "id": "blog-ccc",
+  "type": "blog",
+  "title": "February post",
+  "author": "Writer One",
+  "platform": "example.com",
+  "source_url": "https://example.com/ccc",
+  "published_at": "2024-02-10",
+  "summary": "February summary",
+  "keywords": ["llm", "research"],
+  "collected_at": "2024-02-11T10:00:00",
+  "site_name": "Example Blog"
+}
