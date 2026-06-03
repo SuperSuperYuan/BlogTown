@@ -1,0 +1,13 @@
+{
+  "id": "bilibili-bbb",
+  "type": "video",
+  "title": "January talk",
+  "author": "Author Two",
+  "platform": "bilibili",
+  "source_url": "https://bilibili.com/video/bbb",
+  "published_at": "2024-01-15",
+  "summary": "January summary",
+  "keywords": [],
+  "collected_at": "2024-01-16T10:00:00",
+  "thumbnail_url": "https://img/bbb.jpg"
+}
