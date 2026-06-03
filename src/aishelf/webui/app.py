@@ -39,9 +39,14 @@ def _stream_chat(messages: list[dict]) -> Iterator[str]:
             model=model, messages=messages, stream=True
         )
         for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield _sse({"delta": delta})
+            # Some OpenAI-compatible servers emit trailing usage/keep-alive
+            # chunks with choices == None or []; skip them rather than crash.
+            choices = chunk.choices
+            if not choices:
+                continue
+            content = getattr(choices[0].delta, "content", None)
+            if content:
+                yield _sse({"delta": content})
     except APIConnectionError:
         yield _sse({"error": "无法连接 Hermes，请确认服务正在运行"})
         return
@@ -50,6 +55,9 @@ def _stream_chat(messages: list[dict]) -> Iterator[str]:
         return
     except APIError as exc:
         yield _sse({"error": f"Hermes 调用出错：{exc}"})
+        return
+    except Exception as exc:  # defense in depth: never break the SSE stream silently
+        yield _sse({"error": f"处理 Hermes 响应时出错：{exc}"})
         return
     yield _sse({"done": True})
 
