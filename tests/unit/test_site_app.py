@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from urllib.parse import quote
 
@@ -77,3 +78,41 @@ def test_empty_data_dir_shows_empty_state(tmp_path, monkeypatch):
     r = c.get("/videos")
     assert r.status_code == 200
     assert "暂无内容" in r.text
+
+
+def test_search_groups_videos_and_blogs(client):
+    # "summary" appears in every record's summary field -> both modalities match
+    r = client.get("/search", params={"q": "summary"})
+    assert r.status_code == 200
+    assert "视频" in r.text and "博客" in r.text
+
+
+def test_keyword_links_target_section(client):
+    # youtube-aaa has keyword "ai"; the detail page's keyword links into /videos
+    r = client.get("/videos/youtube-aaa")
+    assert r.status_code == 200
+    assert "/videos?keyword=ai" in r.text
+
+
+def test_non_http_url_scheme_is_sanitized(tmp_path, monkeypatch):
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    rec = {
+        "id": "evil",
+        "type": "video",
+        "title": "Evil",
+        "author": "A",
+        "platform": "x",
+        "source_url": "javascript:alert(1)",
+        "published_at": "2024-01-01",
+        "summary": "s",
+        "keywords": [],
+        "collected_at": "2024-01-01T00:00:00",
+        "thumbnail_url": "javascript:alert(2)",
+    }
+    (videos / "evil.json").write_text(json.dumps(rec), encoding="utf-8")
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    from aishelf.site.app import app
+    r = TestClient(app).get("/videos/evil")
+    assert r.status_code == 200
+    assert "javascript:alert" not in r.text  # both href and img src blanked

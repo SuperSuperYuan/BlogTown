@@ -30,7 +30,18 @@ def _fmt_duration(seconds) -> str:
     return f"{hours}:{minutes:02d}:{sec:02d}" if hours else f"{minutes}:{sec:02d}"
 
 
+def _safe_url(url) -> str:
+    """Blank out non-http(s) URLs so scraped data can't inject javascript:/data: links."""
+    if not url:
+        return ""
+    scheme = str(url).split(":", 1)[0].strip().lower() if ":" in str(url) else ""
+    if scheme and scheme not in ("http", "https"):
+        return ""
+    return str(url)
+
+
 templates.env.filters["duration"] = _fmt_duration
+templates.env.filters["safe_url"] = _safe_url
 
 app = FastAPI(title="aishelf")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")

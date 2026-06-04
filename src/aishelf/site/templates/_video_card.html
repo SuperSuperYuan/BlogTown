@@ -1,5 +1,5 @@
 <a class="card" href="/videos/{{ it.id }}">
-  <span class="thumb"><img src="{{ it.thumbnail_url }}" alt="" loading="lazy" />
+  <span class="thumb"><img src="{{ it.thumbnail_url|safe_url }}" alt="" loading="lazy" />
     {% if it.duration_seconds %}<span class="dur">{{ it.duration_seconds|duration }}</span>{% endif %}
   </span>
   <span class="title">{{ it.title }}</span>
