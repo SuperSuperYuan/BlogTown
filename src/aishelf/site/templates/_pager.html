@@ -1,0 +1,7 @@
+{% if page.total_pages > 1 %}
+<nav class="pager">
+  {% if page.has_prev %}<a href="?page={{ page.page - 1 }}{% if keyword %}&keyword={{ keyword|urlencode }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}">上一页</a>{% endif %}
+  <span>{{ page.page }} / {{ page.total_pages }}</span>
+  {% if page.has_next %}<a href="?page={{ page.page + 1 }}{% if keyword %}&keyword={{ keyword|urlencode }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}">下一页</a>{% endif %}
+</nav>
+{% endif %}

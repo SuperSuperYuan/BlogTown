@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}搜索「{{ q }}」· aishelf{% endblock %}
+{% block content %}
+<h1>搜索「{{ q }}」</h1>
+{% if page.total == 0 %}<p class="empty">没有匹配的内容</p>
+{% else %}
+{% if videos %}<h2>视频</h2><div class="grid">{% for it in videos %}{% include "_video_card.html" %}{% endfor %}</div>{% endif %}
+{% if blogs %}<h2>博客</h2><ul class="bloglist">{% for it in blogs %}{% include "_blog_row.html" %}{% endfor %}</ul>{% endif %}
+{% include "_pager.html" %}{% endif %}
+{% endblock %}

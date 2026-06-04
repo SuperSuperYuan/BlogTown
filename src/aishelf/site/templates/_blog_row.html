@@ -1,0 +1,8 @@
+<li class="blogrow">
+  {% if it.cover_image_url %}<img class="cover" src="{{ it.cover_image_url|safe_url }}" alt="" loading="lazy" />{% endif %}
+  <div class="blogtext">
+    <a class="title" href="/blogs/{{ it.id }}">{{ it.title }}</a>
+    <div class="sub">{{ it.author }} · {{ it.published_at[:10] }}{% if it.site_name %} · {{ it.site_name }}{% endif %}</div>
+    <p class="summary">{{ it.summary }}</p>
+  </div>
+</li>

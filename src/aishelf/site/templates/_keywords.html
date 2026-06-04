@@ -1,0 +1,5 @@
+{% if item.keywords %}
+<div class="keywords">
+  {% for kw in item.keywords %}<a href="{{ section_url }}?keyword={{ kw|urlencode }}">{{ kw }}</a>{% endfor %}
+</div>
+{% endif %}

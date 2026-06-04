@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h2>最新视频 <a class="more" href="/videos">更多 →</a></h2>
+  {% if videos %}<div class="grid">{% for it in videos %}{% include "_video_card.html" %}{% endfor %}</div>
+  {% else %}<p class="empty">暂无内容</p>{% endif %}
+</section>
+<section>
+  <h2>最新博客 <a class="more" href="/blogs">更多 →</a></h2>
+  {% if blogs %}<ul class="bloglist">{% for it in blogs %}{% include "_blog_row.html" %}{% endfor %}</ul>
+  {% else %}<p class="empty">暂无内容</p>{% endif %}
+</section>
+{% endblock %}
