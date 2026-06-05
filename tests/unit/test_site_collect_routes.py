@@ -33,7 +33,7 @@ class _FakeClient:
 def test_collect_page_renders(client):
     r = client.get("/collect")
     assert r.status_code == 200
-    assert "采集" in r.text
+    assert "Hermes" in r.text
 
 
 def test_collect_page_has_history_controls(client):

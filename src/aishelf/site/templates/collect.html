@@ -1,16 +1,35 @@
 {% extends "base.html" %}
-{% block title %}采集 · aishelf{% endblock %}
+{% block title %}Hermes · aishelf{% endblock %}
 {% block content %}
-<div class="collect">
-  <h1>采集</h1>
-  <p class="lead">描述你想采集的内容，例如：爬取 Karpathy 最近的视频。Hermes 会去抓取并写入，完成后到下面查看结果。</p>
-  <div class="chattools"><button id="chatclear" type="button">清除对话</button></div>
+<div class="hermes">
+  <header class="hermes-head">
+    <div class="hermes-avatar">H</div>
+    <div>
+      <h1>Hermes</h1>
+      <p class="lead">用自然语言让 Hermes 去采集视频 / 博客，完成后到下方查看结果。</p>
+    </div>
+  </header>
+
   <div id="log" class="chatlog"></div>
-  <form id="chatform" class="chatform">
-    <input id="chatinput" autocomplete="off" placeholder="输入采集需求…" />
-    <button type="submit" id="chatsend">发送</button>
+
+  <div id="examples" class="examples">
+    <span class="examples-label">试试：</span>
+    <button type="button" class="chip">爬取 Karpathy 最近的视频</button>
+    <button type="button" class="chip">找几篇关于 AI agent 的博客</button>
+    <button type="button" class="chip">抓 3Blue1Brown 的一个视频</button>
+  </div>
+
+  <form id="chatform" class="composer">
+    <textarea id="chatinput" rows="1" placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…"></textarea>
+    <button type="submit" id="chatsend" class="send" title="发送" aria-label="发送">➤</button>
   </form>
-  <div class="resultlinks"><a class="btn" href="/videos">查看视频</a><a class="btn" href="/blogs">查看博客</a></div>
+
+  <div class="actionbar">
+    <button id="chatclear" type="button" class="ghost">清除对话</button>
+    <span class="spacer"></span>
+    <a class="btn" href="/videos">查看视频</a>
+    <a class="btn" href="/blogs">查看博客</a>
+  </div>
 </div>
 <script>
 const STORAGE_KEY = "aishelf_collect_history";
@@ -19,6 +38,7 @@ const form = document.getElementById("chatform");
 const input = document.getElementById("chatinput");
 const sendBtn = document.getElementById("chatsend");
 const clearBtn = document.getElementById("chatclear");
+const examples = document.getElementById("examples");
 
 function loadHistory() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -30,29 +50,49 @@ function saveHistory() {
 
 const messages = loadHistory();
 
+// Returns the bubble element (the text container) for streaming updates.
 function bubble(cls, text) {
-  const el = document.createElement("div");
-  el.className = "bubble " + cls;
-  el.textContent = text;
-  log.appendChild(el);
+  const row = document.createElement("div");
+  row.className = "msg " + cls;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = cls === "user" ? "我" : "H";
+  const body = document.createElement("div");
+  body.className = "bubble " + cls;
+  body.textContent = text;
+  row.append(avatar, body);
+  log.appendChild(row);
   log.scrollTop = log.scrollHeight;
-  return el;
+  return body;
 }
 
-// Show three bouncing dots until the first token arrives.
+// Three bouncing dots until the first token arrives.
 function showTyping(el) {
   el.classList.add("typing");
   el.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
 }
 
+function updateExamples() {
+  examples.style.display = messages.length ? "none" : "flex";
+}
+
+// Auto-grow the composer textarea.
+function autosize() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 200) + "px";
+}
+input.addEventListener("input", autosize);
+
 // Restore prior conversation on load so a refresh keeps the history.
 for (const m of messages) {
   bubble(m.role === "user" ? "user" : "assistant", m.content);
 }
+updateExamples();
 
 async function send(text) {
   messages.push({ role: "user", content: text });
   saveHistory();
+  updateExamples();
   bubble("user", text);
   const assistantEl = bubble("assistant", "");
   showTyping(assistantEl);
@@ -96,7 +136,6 @@ async function send(text) {
       try { payload = JSON.parse(raw.slice(6)); } catch { continue; }
       if (payload.delta) {
         if (!streaming) {
-          // first token: drop the dots, switch to a blinking caret while streaming
           streaming = true;
           assistantEl.classList.remove("typing");
           assistantEl.classList.add("streaming");
@@ -113,25 +152,43 @@ async function send(text) {
       }
     }
   }
-  // stream ended without an explicit done/error (e.g. dropped connection):
-  // never leave the indicator spinning forever.
   assistantEl.classList.remove("typing", "streaming");
 }
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+function submitCurrent() {
   const text = input.value.trim();
   if (!text) return;
   input.value = "";
+  autosize();
   sendBtn.disabled = true;
-  try { await send(text); } finally { sendBtn.disabled = false; input.focus(); }
+  send(text).finally(() => { sendBtn.disabled = false; input.focus(); });
+}
+
+form.addEventListener("submit", (e) => { e.preventDefault(); submitCurrent(); });
+
+// Enter sends; Shift+Enter inserts a newline.
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    submitCurrent();
+  }
 });
+
+// Example chips fill the composer.
+for (const chip of examples.querySelectorAll(".chip")) {
+  chip.addEventListener("click", () => {
+    input.value = chip.textContent;
+    autosize();
+    input.focus();
+  });
+}
 
 clearBtn.addEventListener("click", () => {
   if (messages.length && !confirm("确定清除全部对话历史？")) return;
   messages.length = 0;
   localStorage.removeItem(STORAGE_KEY);
   log.innerHTML = "";
+  updateExamples();
 });
 </script>
 {% endblock %}
