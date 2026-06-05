@@ -76,3 +76,7 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .note-bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
 .note-status { color: #52606d; font-size: 13px; }
 .note-status.err { color: #b00020; }
+.delete-bar { display: flex; align-items: center; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid #e4e7eb; }
+.btn-danger { background: #d64545; color: #fff; border: none; padding: 9px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-danger:disabled { opacity: .5; cursor: default; }
