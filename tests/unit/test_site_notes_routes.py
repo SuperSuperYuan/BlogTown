@@ -1,3 +1,4 @@
+import os
 import shutil
 from pathlib import Path
 
@@ -45,3 +46,13 @@ def test_blog_detail_has_note_editor(client):
 def test_save_note_invalid_id_400(client):
     r = client.post("/notes/a..b", json={"text": "x"})  # ".." rejected by _safe_id
     assert r.status_code == 400
+
+
+def test_saving_note_leaves_content_record_untouched(client):
+    data = os.environ["AISHELF_DATA_DIR"]
+    record = Path(data) / "videos" / "youtube-aaa.json"
+    before = record.read_bytes()
+    r = client.post("/notes/youtube-aaa", json={"text": "笔记不应污染内容记录"})
+    assert r.status_code == 200
+    assert record.read_bytes() == before  # Hermes-owned record unchanged
+    assert (Path(data) / "notes" / "youtube-aaa.json").exists()

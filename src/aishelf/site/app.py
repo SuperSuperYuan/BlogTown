@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from aishelf.contract.loader import load_items
 from aishelf.site import collect, hermes, notes, views
@@ -178,7 +178,7 @@ def collect_chat(req: _ChatRequest):
 
 
 class _NoteRequest(BaseModel):
-    text: str
+    text: str = Field(max_length=100_000)
 
 
 @app.post("/notes/{item_id}")

@@ -32,6 +32,11 @@ def test_empty_text_clears_note(data_dir):
     assert notes.load_note("youtube-abc") == ""
 
 
+def test_save_leaves_no_temp_file(data_dir):
+    notes.save_note("youtube-abc", "hi")
+    assert list((data_dir / "notes").glob("*.tmp")) == []
+
+
 @pytest.mark.parametrize("bad", ["../etc", "a/b", "..", "x\\y", "", "a b", "a..b"])
 def test_unsafe_id_rejected(data_dir, bad):
     with pytest.raises(ValueError):
