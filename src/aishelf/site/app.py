@@ -44,7 +44,7 @@ def _safe_url(url) -> str:
 templates.env.filters["duration"] = _fmt_duration
 templates.env.filters["safe_url"] = _safe_url
 
-app = FastAPI(title="aishelf")
+app = FastAPI(title="Atlas")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ key }} · aishelf{% endblock %}
+{% block title %}{{ key }} · Atlas{% endblock %}
 {% block content %}
 <h1>{{ key }}</h1>
 {% if videos %}<h2>视频</h2><div class="grid">{% for it in videos %}{% include "_video_card.html" %}{% endfor %}</div>{% endif %}
