@@ -27,6 +27,14 @@ def test_delete_removes_record_and_note(client):
     assert c.get("/videos/youtube-aaa").status_code == 404
 
 
+def test_delete_blog_via_route(client):
+    c, data = client
+    r = c.post("/delete/blog-ccc")
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert not (data / "blogs" / "blog-ccc.json").exists()
+    assert c.get("/blogs/blog-ccc").status_code == 404
+
+
 def test_delete_unknown_404(client):
     c, _ = client
     assert c.post("/delete/nope-zzz").status_code == 404

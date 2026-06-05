@@ -7,6 +7,7 @@ import re
 from aishelf.site.config import get_data_dir
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+# Mirrors the modality dirs read by contract.loader; keep the two in sync.
 _MODALITY_DIRS = ("videos", "blogs")
 
 
@@ -27,9 +28,10 @@ def delete_item(item_id: str) -> bool:
     base = get_data_dir()
     removed_record = False
     for sub in _MODALITY_DIRS:
-        path = base / sub / f"{item_id}.json"
-        if path.exists():
-            path.unlink()
+        try:
+            (base / sub / f"{item_id}.json").unlink()  # race-free vs exists()+unlink
             removed_record = True
+        except FileNotFoundError:
+            pass
     (base / "notes" / f"{item_id}.json").unlink(missing_ok=True)
     return removed_record
