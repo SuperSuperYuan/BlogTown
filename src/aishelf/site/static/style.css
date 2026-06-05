@@ -39,6 +39,32 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .hermes-avatar { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #0a84ff, #0a5fff); color: #fff; font-weight: 700; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none; }
 .hermes-head h1 { margin: 0; font-size: 24px; }
 .hermes .lead { margin: 2px 0 0; color: #7b8794; font-size: 14px; }
+.schedules { margin-top: 26px; padding-top: 18px; border-top: 1px solid #e4e7eb; }
+.schedules h2 { margin: 0 0 2px; font-size: 18px; }
+.schedules .lead { margin: 0 0 14px; color: #7b8794; font-size: 13px; }
+.schedules .empty { color: #9aa5b1; font-size: 14px; padding: 8px 0 14px; }
+.sched-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+.sched-table th { text-align: left; color: #7b8794; font-weight: 600; font-size: 12px; padding: 6px 10px; border-bottom: 1px solid #e4e7eb; }
+.sched-table td { padding: 9px 10px; border-bottom: 1px solid #f0f2f5; vertical-align: top; }
+.sched-time { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.sched-prompt { color: #3e4c59; max-width: 360px; }
+.sched-last { color: #9aa5b1; white-space: nowrap; }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; }
+.badge.on { background: #e3f6e9; color: #1a7f37; }
+.badge.off { background: #f0f2f5; color: #9aa5b1; }
+.sched-actions { white-space: nowrap; }
+.link { background: none; border: none; padding: 0 8px 0 0; color: #0a84ff; font: inherit; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+.link.danger { color: #b00020; }
+.sched-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sched-form input[type="text"], .sched-form input:not([type]), .sched-form input[type="time"] { border: 1px solid #cbd2d9; border-radius: 8px; padding: 7px 11px; font: inherit; outline: none; }
+.sched-form input:focus { border-color: #0a84ff; box-shadow: 0 0 0 3px rgba(10, 132, 255, .12); }
+.sched-form .grow { flex: 1; min-width: 220px; }
+.sched-form .chk { display: flex; align-items: center; gap: 5px; font-size: 14px; color: #3e4c59; }
+.btn.primary { background: #0a84ff; color: #fff; border-color: #0a84ff; }
+.sched-msg { font-size: 13px; }
+.sched-msg.ok { color: #1a7f37; }
+.sched-msg.err { color: #b00020; }
 .tokenbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; background: #f7f9fc; border: 1px solid #e4e7eb; border-radius: 12px; }
 .tokenbar label { font-size: 13px; font-weight: 600; color: #3e4c59; flex: none; }
 .tokenbar input { flex: 1; min-width: 160px; border: 1px solid #cbd2d9; border-radius: 8px; padding: 7px 11px; font: inherit; outline: none; }

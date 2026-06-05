@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -94,6 +95,34 @@ def load_schedules(path=None) -> list[Schedule]:
         seen.add(sched.name)
         out.append(sched)
     return out
+
+
+def save_schedules(schedules: list[Schedule], path=None) -> None:
+    """Serialize schedules to YAML and write atomically (mkstemp + replace)."""
+    payload = {
+        "schedules": [
+            {
+                "name": s.name,
+                "time": f"{s.hour:02d}:{s.minute:02d}",
+                "prompt": s.prompt,
+                "enabled": s.enabled,
+            }
+            for s in schedules
+        ]
+    }
+    final = _schedules_path(path)
+    final.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=final.parent, prefix=f"{final.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(payload, fh, allow_unicode=True, sort_keys=False)
+        os.replace(tmp_name, final)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 
 def due_schedules(schedules: list[Schedule], state: dict[str, str], now: datetime) -> list[Schedule]:

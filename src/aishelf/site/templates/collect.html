@@ -36,6 +36,44 @@
     <a class="btn" href="/videos">查看视频</a>
     <a class="btn" href="/blogs">查看博客</a>
   </div>
+
+  <section class="schedules">
+    <h2>定时采集</h2>
+    <p class="lead">到点自动重跑采集需求（站点需保持运行；错过的当天任务下次启动时补跑）。新增 / 修改需要上方的采集口令。</p>
+
+    {% if schedules %}
+    <table class="sched-table">
+      <thead><tr><th>时间</th><th>名称</th><th>采集需求</th><th>状态</th><th>上次运行</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for s in schedules %}
+        <tr data-name="{{ s.name }}" data-hour="{{ s.hour }}" data-minute="{{ s.minute }}" data-prompt="{{ s.prompt }}" data-enabled="{{ 'true' if s.enabled else 'false' }}">
+          <td class="sched-time">{{ "%02d:%02d"|format(s.hour, s.minute) }}</td>
+          <td>{{ s.name }}</td>
+          <td class="sched-prompt">{{ s.prompt }}</td>
+          <td>{% if s.enabled %}<span class="badge on">启用</span>{% else %}<span class="badge off">停用</span>{% endif %}</td>
+          <td class="sched-last">{{ last_run.get(s.name, "未运行") }}</td>
+          <td class="sched-actions">
+            <button type="button" class="link js-sched-toggle">{{ "停用" if s.enabled else "启用" }}</button>
+            <button type="button" class="link js-sched-edit">编辑</button>
+            <button type="button" class="link danger js-sched-delete">删除</button>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">暂无定时任务</p>
+    {% endif %}
+
+    <form id="schedform" class="sched-form">
+      <input id="sched-name" placeholder="名称（字母/数字 . - _）" autocomplete="off" />
+      <input id="sched-time" type="time" value="10:00" />
+      <input id="sched-prompt" class="grow" placeholder="采集需求，例如：检查 Karpathy 最近视频，有新的就采集" autocomplete="off" />
+      <label class="chk"><input id="sched-enabled" type="checkbox" checked /> 启用</label>
+      <button type="submit" class="btn primary">保存计划</button>
+      <span id="sched-msg" class="sched-msg"></span>
+    </form>
+  </section>
 </div>
 <script>
 const STORAGE_KEY = "aishelf_collect_history";
@@ -214,5 +252,72 @@ clearBtn.addEventListener("click", () => {
   log.innerHTML = "";
   updateExamples();
 });
+
+// ---- 定时采集 ----
+const schedForm = document.getElementById("schedform");
+const schedMsgEl = document.getElementById("sched-msg");
+
+function schedMsg(text, ok) {
+  schedMsgEl.textContent = text;
+  schedMsgEl.className = "sched-msg" + (ok ? " ok" : " err");
+}
+
+async function schedPost(url, body) {
+  const headers = { "X-Collect-Token": (localStorage.getItem(TOKEN_KEY) || "").trim() };
+  if (body) headers["Content-Type"] = "application/json";
+  return fetch(url, { method: "POST", headers, body: body ? JSON.stringify(body) : undefined });
+}
+
+async function handleSchedResp(resp) {
+  if (resp.status === 403) {
+    schedMsg("🔒 采集口令无效，请在上方填写口令", false);
+    tokenInput.classList.add("invalid");
+    tokenInput.focus();
+    return;
+  }
+  if (!resp.ok) {
+    let detail = "";
+    try { detail = (await resp.json()).detail || ""; } catch {}
+    schedMsg("⚠️ " + (detail || ("HTTP " + resp.status)), false);
+    return;
+  }
+  location.reload();
+}
+
+schedForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("sched-name").value.trim();
+  const time = document.getElementById("sched-time").value;
+  const prompt = document.getElementById("sched-prompt").value.trim();
+  const enabled = document.getElementById("sched-enabled").checked;
+  if (!name || !time || !prompt) { schedMsg("名称、时间、需求都要填", false); return; }
+  await handleSchedResp(await schedPost("/schedules", { name, time, prompt, enabled }));
+});
+
+for (const btn of document.querySelectorAll(".js-sched-toggle")) {
+  btn.addEventListener("click", async () => {
+    const name = btn.closest("tr").dataset.name;
+    await handleSchedResp(await schedPost(`/schedules/${encodeURIComponent(name)}/toggle`));
+  });
+}
+for (const btn of document.querySelectorAll(".js-sched-delete")) {
+  btn.addEventListener("click", async () => {
+    const name = btn.closest("tr").dataset.name;
+    if (!confirm(`删除定时任务「${name}」？`)) return;
+    await handleSchedResp(await schedPost(`/schedules/${encodeURIComponent(name)}/delete`));
+  });
+}
+for (const btn of document.querySelectorAll(".js-sched-edit")) {
+  btn.addEventListener("click", () => {
+    const d = btn.closest("tr").dataset;
+    document.getElementById("sched-name").value = d.name;
+    document.getElementById("sched-time").value =
+      String(d.hour).padStart(2, "0") + ":" + String(d.minute).padStart(2, "0");
+    document.getElementById("sched-prompt").value = d.prompt;
+    document.getElementById("sched-enabled").checked = d.enabled === "true";
+    schedMsg("正在编辑「" + d.name + "」，保存即覆盖", true);
+    document.getElementById("sched-name").focus();
+  });
+}
 </script>
 {% endblock %}
