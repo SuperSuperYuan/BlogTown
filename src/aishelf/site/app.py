@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from aishelf.contract.loader import load_items
-from aishelf.site import collect, hermes, notes, views
+from aishelf.site import collect, hermes, items, notes, views
 from aishelf.site.config import get_data_dir
 
 BASE = Path(__file__).parent
@@ -188,3 +188,14 @@ def save_note_route(item_id: str, req: _NoteRequest):
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid note id")
     return {"ok": True, "updated_at": updated_at}
+
+
+@app.post("/delete/{item_id}")
+def delete_item_route(item_id: str):
+    try:
+        removed = items.delete_item(item_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid id")
+    if not removed:
+        raise HTTPException(status_code=404, detail="not found")
+    return {"ok": True}
