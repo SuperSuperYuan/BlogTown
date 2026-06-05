@@ -44,6 +44,14 @@ def test_collect_page_has_history_controls(client):
     assert "清除对话" in r.text
 
 
+def test_collect_page_has_progress_indicator(client):
+    r = client.get("/collect")
+    assert r.status_code == 200
+    # in-progress affordances: typing dots before first token, caret while streaming
+    assert "showTyping" in r.text
+    assert "streaming" in r.text
+
+
 def test_nav_has_collect_link(client):
     r = client.get("/")
     assert r.status_code == 200
