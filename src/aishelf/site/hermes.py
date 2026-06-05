@@ -9,7 +9,8 @@ from typing import Iterator
 from openai import APIConnectionError, APIError, APIStatusError, OpenAI
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8642/v1"
-DEFAULT_API_KEY = "EFd96sbMIobQK7pnHHEJ0Ri4VnfYNa_-rTcY8WiTZt4"
+# No committed credential: set HERMES_API_KEY in the environment.
+DEFAULT_API_KEY = ""
 DEFAULT_MODEL = "hermes-agent"
 
 

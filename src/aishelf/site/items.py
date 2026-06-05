@@ -33,5 +33,8 @@ def delete_item(item_id: str) -> bool:
             removed_record = True
         except FileNotFoundError:
             pass
-    (base / "notes" / f"{item_id}.json").unlink(missing_ok=True)
+    # Only remove the note when a record was actually deleted, so a 404
+    # (no such item) never destroys a lingering note as a side effect.
+    if removed_record:
+        (base / "notes" / f"{item_id}.json").unlink(missing_ok=True)
     return removed_record
