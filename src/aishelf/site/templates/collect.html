@@ -39,6 +39,12 @@ function bubble(cls, text) {
   return el;
 }
 
+// Show three bouncing dots until the first token arrives.
+function showTyping(el) {
+  el.classList.add("typing");
+  el.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+}
+
 // Restore prior conversation on load so a refresh keeps the history.
 for (const m of messages) {
   bubble(m.role === "user" ? "user" : "assistant", m.content);
@@ -49,7 +55,16 @@ async function send(text) {
   saveHistory();
   bubble("user", text);
   const assistantEl = bubble("assistant", "");
+  showTyping(assistantEl);
   let acc = "";
+  let streaming = false;
+
+  function fail(msg) {
+    assistantEl.classList.remove("typing", "streaming");
+    assistantEl.classList.add("error");
+    assistantEl.textContent = msg;
+  }
+
   let resp;
   try {
     resp = await fetch("/collect/chat", {
@@ -58,13 +73,11 @@ async function send(text) {
       body: JSON.stringify({ messages }),
     });
   } catch (e) {
-    assistantEl.classList.add("error");
-    assistantEl.textContent = "⚠️ 请求失败：" + e;
+    fail("⚠️ 请求失败：" + e);
     return;
   }
   if (!resp.ok || !resp.body) {
-    assistantEl.classList.add("error");
-    assistantEl.textContent = "⚠️ 请求失败：HTTP " + resp.status;
+    fail("⚠️ 请求失败：HTTP " + resp.status);
     return;
   }
   const reader = resp.body.getReader();
@@ -82,18 +95,27 @@ async function send(text) {
       let payload;
       try { payload = JSON.parse(raw.slice(6)); } catch { continue; }
       if (payload.delta) {
+        if (!streaming) {
+          // first token: drop the dots, switch to a blinking caret while streaming
+          streaming = true;
+          assistantEl.classList.remove("typing");
+          assistantEl.classList.add("streaming");
+        }
         acc += payload.delta;
         assistantEl.textContent = acc;
         log.scrollTop = log.scrollHeight;
       } else if (payload.error) {
-        assistantEl.classList.add("error");
-        assistantEl.textContent = "⚠️ " + payload.error;
+        fail("⚠️ " + payload.error);
       } else if (payload.done) {
+        assistantEl.classList.remove("typing", "streaming");
         messages.push({ role: "assistant", content: acc });
         saveHistory();
       }
     }
   }
+  // stream ended without an explicit done/error (e.g. dropped connection):
+  // never leave the indicator spinning forever.
+  assistantEl.classList.remove("typing", "streaming");
 }
 
 form.addEventListener("submit", async (e) => {
