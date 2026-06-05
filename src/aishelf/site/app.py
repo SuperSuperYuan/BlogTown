@@ -48,8 +48,8 @@ def _require_collect_token(token: str | None) -> None:
 BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
-VIDEOS_PER_PAGE = 24
-BLOGS_PER_PAGE = 20
+VIDEOS_PER_PAGE = 12
+BLOGS_PER_PAGE = 10
 SEARCH_PER_PAGE = 20
 HOME_PREVIEW = 8
 
