@@ -254,7 +254,6 @@ for (const chip of examples.querySelectorAll(".chip")) {
 }
 
 clearBtn.addEventListener("click", () => {
-  if (messages.length && !confirm("确定清除全部对话历史？")) return;
   messages.length = 0;
   localStorage.removeItem(STORAGE_KEY);
   log.innerHTML = "";
