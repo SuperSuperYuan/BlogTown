@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -32,13 +33,23 @@ def _fmt_duration(seconds) -> str:
 
 
 def _safe_url(url) -> str:
-    """Blank out non-http(s) URLs so scraped data can't inject javascript:/data: links."""
+    """Allow only absolute http(s) URLs from scraped data.
+
+    Blanks javascript:/data: schemes, scheme-relative `//host` URLs, and bare
+    scheme-less values — anything that isn't an explicit http/https URL.
+    """
     if not url:
         return ""
-    scheme = str(url).split(":", 1)[0].strip().lower() if ":" in str(url) else ""
-    if scheme and scheme not in ("http", "https"):
+    candidate = str(url).strip()
+    return candidate if urlsplit(candidate).scheme.lower() in ("http", "https") else ""
+
+
+def _note_for(item) -> str:
+    """An item's note, tolerating a record whose id is not path-safe (-> no note)."""
+    try:
+        return notes.load_note(item.id)
+    except ValueError:
         return ""
-    return str(url)
 
 
 templates.env.filters["duration"] = _fmt_duration
@@ -110,7 +121,7 @@ def video_detail(request: Request, item_id: str):
     return templates.TemplateResponse(
         request,
         "video_detail.html",
-        {"item": item, "section_url": "/videos", "note": notes.load_note(item.id)},
+        {"item": item, "section_url": "/videos", "note": _note_for(item)},
     )
 
 
@@ -122,7 +133,7 @@ def blog_detail(request: Request, item_id: str):
     return templates.TemplateResponse(
         request,
         "blog_detail.html",
-        {"item": item, "section_url": "/blogs", "note": notes.load_note(item.id)},
+        {"item": item, "section_url": "/blogs", "note": _note_for(item)},
     )
 
 

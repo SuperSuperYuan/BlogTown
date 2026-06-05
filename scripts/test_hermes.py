@@ -21,9 +21,7 @@ import sys
 from openai import APIConnectionError, APIStatusError, OpenAI
 
 BASE_URL = os.environ.get("HERMES_BASE_URL", "http://127.0.0.1:8642/v1")
-API_KEY = os.environ.get(
-    "HERMES_API_KEY", "EFd96sbMIobQK7pnHHEJ0Ri4VnfYNa_-rTcY8WiTZt4"
-)
+API_KEY = os.environ.get("HERMES_API_KEY", "")  # set HERMES_API_KEY in the environment
 MODEL = os.environ.get("HERMES_MODEL", "hermes-agent")
 
 

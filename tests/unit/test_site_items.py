@@ -39,6 +39,14 @@ def test_delete_unknown_returns_false(data_dir):
     assert items.delete_item("nope-z") is False
 
 
+def test_delete_no_record_keeps_orphan_note(data_dir):
+    # a lingering note with no content record must NOT be destroyed by a no-op delete
+    note = data_dir / "notes" / "orphan-x.json"
+    _write(note, {"id": "orphan-x", "text": "keep me"})
+    assert items.delete_item("orphan-x") is False
+    assert note.exists()
+
+
 def test_delete_record_without_note_ok(data_dir):
     rec = data_dir / "videos" / "youtube-x.json"
     _write(rec, {"id": "youtube-x"})
