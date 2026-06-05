@@ -58,6 +58,29 @@ on refresh — no restart. **Fail-closed:** a missing or empty allowlist denies
 everyone. Browsing, notes, and delete are not gated. Note: the passcode is sent
 in plaintext, so this guards against accidental LAN triggering, not real attackers.
 
+### Scheduled collection
+
+Atlas can re-run a collection prompt on a daily timer — e.g. "every day at 10:00,
+check a blogger for new videos and collect them." Because Hermes writes records
+idempotently by id, re-running the prompt simply adds anything new, so there's no
+separate update-detection to configure.
+
+```bash
+cp config/schedules.example.yaml config/schedules.yaml
+# edit it: one entry per schedule (name, time "HH:MM", prompt, enabled)
+```
+
+When you start the site, a background scheduler runs alongside it and fires any
+schedule whose time has passed today and that hasn't run yet today. If the
+machine was asleep at the scheduled time, the run is caught up on the next start.
+A failed run is logged and retried; last-run dates are tracked in
+`data/schedule_state.json`.
+
+Scheduled runs **bypass the collect passcode** (no human to enter it) — the
+`config/schedules.yaml` file itself is the authorization. Disable the scheduler
+by starting with `AISHELF_SCHEDULER_ENABLED=` (empty); point it at another file
+with `AISHELF_SCHEDULES=...`.
+
 ## Configuration
 
 | Env var | Default | Purpose |
@@ -65,6 +88,8 @@ in plaintext, so this guards against accidental LAN triggering, not real attacke
 | `AISHELF_DATA_DIR` | `data` | Where content + notes are stored |
 | `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` | `127.0.0.1` / `8001` | Site bind address |
 | `AISHELF_COLLECT_ALLOWLIST` | `config/collect_allowlist.txt` | Collect passcode allowlist |
+| `AISHELF_SCHEDULES` | `config/schedules.yaml` | Timed-collection config |
+| `AISHELF_SCHEDULER_ENABLED` | `1` (set by launcher) | Run the scheduler; empty to disable |
 | `HERMES_BASE_URL` / `HERMES_API_KEY` / `HERMES_MODEL` | `http://127.0.0.1:8642/v1` / — / `hermes-agent` | Hermes connection |
 
 ### LAN access

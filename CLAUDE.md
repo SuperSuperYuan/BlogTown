@@ -39,10 +39,14 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/contract/` — `models.py` (`VideoItem`/`BlogItem` discriminated on
   `type`, `parse_item`), `loader.py` (`load_items` — validate + skip-bad + sort),
   `schema.py` (export to `docs/contract/content-item.schema.json`).
-- `aishelf/site/` — `app.py` (routes), `views.py` (pure filter/search/paginate),
-  `hermes.py` (Hermes connection + robust SSE `stream_chat`), `collect.py`
-  (system-prompt builder), `notes.py` (per-item notes), `items.py` (`safe_id` +
-  `delete_item`), `templates/`, `static/`, `__main__.py`.
+- `aishelf/site/` — `app.py` (routes + scheduler lifespan), `views.py` (pure
+  filter/search/paginate), `hermes.py` (Hermes connection + robust SSE
+  `stream_chat`), `collect.py` (system-prompt builder + non-streaming
+  `run_once`), `notes.py` (per-item notes), `items.py` (`safe_id` +
+  `delete_item`), `allowlist.py` (collect passcode gate), `schedules.py`
+  (config load + pure `due_schedules`), `schedule_state.py` (last-run dates),
+  `scheduler.py` (background `run_due_now` loop), `templates/`, `static/`,
+  `__main__.py`.
 
 **Data & storage** (`data/`, gitignored):
 
@@ -71,6 +75,11 @@ Source layout uses a `src/` directory; package is `aishelf`.
   (default `http://127.0.0.1:8642/v1`, model `hermes-agent`).
 - `AISHELF_COLLECT_ALLOWLIST` — path to the collect passcode allowlist
   (default `config/collect_allowlist.txt`).
+- `AISHELF_SCHEDULES` — path to the timed-collection config
+  (default `config/schedules.yaml`).
+- `AISHELF_SCHEDULER_ENABLED` — `__main__.py` sets it to `1` so the scheduler
+  runs alongside the site; set it empty to disable. The test client never sets
+  it, so `TestClient` spins up no background thread.
 
 **Collect access control** (`aishelf.site.allowlist`): `POST /collect/chat` is
 gated by a hand-maintained passcode allowlist so only approved callers can spend
@@ -82,6 +91,18 @@ gets a 403 and never touches Hermes. **Fail-closed**: a missing/empty allowlist
 denies everyone. Tokens are plaintext over the LAN — enough to stop accidental
 collection by LAN visitors, not real auth.
 
-`config/authors.example.yaml` and `config/collect_allowlist.example.txt` are
-committed templates; the live `config/authors.yaml` and
-`config/collect_allowlist.txt` are gitignored.
+**Scheduled collection** (`aishelf.site.scheduler` + `schedules` +
+`schedule_state`): when the site runs, a daemon thread wakes every 60s and runs
+any schedule in `config/schedules.yaml` that is due — `enabled`, past today's
+`HH:MM`, and not yet run today (per `data/schedule_state.json`). Because Hermes
+writes idempotently by id, "collect if updated" is just re-running the saved
+prompt via `collect.run_once` (non-streaming). Missed runs (machine asleep at
+the time) are caught up on the next tick/startup; a failed run is logged and
+left unrecorded so it retries. `due_schedules` is a pure function (the tested
+core). Scheduled runs bypass the collect passcode (no human to enter it) — the
+config file *is* the authorization.
+
+`config/authors.example.yaml`, `config/collect_allowlist.example.txt`, and
+`config/schedules.example.yaml` are committed templates; the live
+`config/authors.yaml`, `config/collect_allowlist.txt`, and
+`config/schedules.yaml` are gitignored.

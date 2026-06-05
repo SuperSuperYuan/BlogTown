@@ -12,9 +12,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 import logging
+import os
+import threading
+from contextlib import asynccontextmanager
 
 from aishelf.contract.loader import load_items
-from aishelf.site import allowlist, collect, hermes, items, notes, views
+from aishelf.site import allowlist, collect, hermes, items, notes, scheduler, views
 from aishelf.site.config import get_data_dir
 
 logger = logging.getLogger(__name__)
@@ -59,7 +62,19 @@ def _note_for(item) -> str:
 templates.env.filters["duration"] = _fmt_duration
 templates.env.filters["safe_url"] = _safe_url
 
-app = FastAPI(title="Atlas")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Start the timed-collection scheduler only when explicitly enabled, so the
+    # test client (which doesn't set the flag) never spawns a background thread.
+    stop = None
+    if os.environ.get("AISHELF_SCHEDULER_ENABLED"):
+        stop = scheduler.start()
+    yield
+    if stop is not None:
+        stop.set()
+
+
+app = FastAPI(title="Atlas", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 
 
