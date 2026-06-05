@@ -2,6 +2,7 @@
 {% block title %}Hermes · Atlas{% endblock %}
 {% block content %}
 <div class="hermes">
+  <div class="hermes-main">
   <section class="card hermes-intro">
     <header class="hermes-head">
       <div class="hermes-avatar">H</div>
@@ -17,7 +18,6 @@
     </div>
   </section>
 
-  <div class="hermes-cols">
   <section class="card chat-card">
     <div id="log" class="chatlog"></div>
 
@@ -40,8 +40,11 @@
       <a class="textlink" href="/blogs">查看博客</a>
     </div>
   </section>
+  </div>
 
-  <section class="card schedules">
+  <details class="sched-dock">
+    <summary><span class="sched-dock-ico" aria-hidden="true">🕒</span>定时采集<span class="sched-dock-count">{{ schedules|length }}</span></summary>
+    <section class="card schedules sched-pop">
     <h2>定时采集</h2>
     <p class="lead">到点自动重跑采集需求（站点需保持运行；错过的当天任务下次启动时补跑）。新增 / 修改需要上方的采集口令。</p>
 
@@ -77,8 +80,8 @@
       <button type="submit" class="btn primary">保存计划</button>
       <span id="sched-msg" class="sched-msg"></span>
     </form>
-  </section>
-  </div>
+    </section>
+  </details>
 </div>
 <script>
 const STORAGE_KEY = "aishelf_collect_history";

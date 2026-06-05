@@ -35,18 +35,32 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .pager { display: flex; gap: 14px; align-items: center; justify-content: center; margin: 24px 0; }
 .pager a { color: #0a84ff; }
 /* ---- Hermes 采集页：卡片分区 ---- */
-.hermes { max-width: 1140px; margin: 0 auto; padding-top: 8px; }
+.hermes { max-width: 1180px; margin: 0 auto; padding-top: 8px; position: relative; }
 .hermes .card { display: block; overflow: visible; background: #fff; border: 1px solid #ececf0; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); padding: 22px 24px; margin-bottom: 20px; }
-.hermes .card:last-child { margin-bottom: 0; }
-/* chat + schedules side by side */
-.hermes-cols { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 20px; align-items: start; }
-.hermes-cols .card { margin-bottom: 0; }
-.hermes-cols .chat-card { display: flex; flex-direction: column; min-height: 460px; }
-.hermes-cols .chat-card .actionbar { margin-top: auto; }
-@media (max-width: 920px) {
-  .hermes { max-width: 760px; }
-  .hermes-cols { grid-template-columns: 1fr; }
-  .hermes-cols .chat-card { min-height: 0; }
+/* chat is the centered hero */
+.hermes-main { max-width: 800px; margin: 0 auto; }
+.hermes-main .card:last-child { margin-bottom: 0; }
+.hermes-main .chat-card { display: flex; flex-direction: column; min-height: 540px; }
+.hermes-main .chat-card .actionbar { margin-top: auto; }
+
+/* 定时采集：缩到右上角的小折叠面板 */
+.sched-dock { position: absolute; top: 8px; right: 0; z-index: 20; }
+.sched-dock > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; background: #fff; border: 1px solid #ececf0; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,.05); font-size: 13px; color: #52606d; user-select: none; transition: all .15s; }
+.sched-dock > summary::-webkit-details-marker { display: none; }
+.sched-dock > summary:hover { border-color: #cbd2d9; color: #1f2933; }
+.sched-dock-ico { font-size: 14px; }
+.sched-dock-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #0a84ff; color: #fff; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.sched-dock[open] > summary { background: #0a84ff; color: #fff; border-color: #0a84ff; }
+.sched-dock[open] > summary .sched-dock-count { background: rgba(255,255,255,.3); }
+.sched-pop { position: absolute; top: 46px; right: 0; width: 560px; max-width: 88vw; margin-bottom: 0 !important; box-shadow: 0 12px 32px rgba(0,0,0,.16); max-height: 72vh; overflow-y: auto; }
+.sched-pop h2 { display: none; }
+.sched-pop .lead { margin-top: 0; }
+
+@media (max-width: 1180px) {
+  .hermes { max-width: 800px; }
+  .sched-dock { position: static; margin-top: 20px; text-align: right; }
+  .sched-dock > summary { margin-left: auto; }
+  .sched-pop { position: static; width: auto; max-width: none; margin-top: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); max-height: none; text-align: left; }
 }
 
 /* intro card */
