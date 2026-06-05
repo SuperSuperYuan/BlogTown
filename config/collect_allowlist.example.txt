@@ -1,0 +1,12 @@
+# Atlas 采集白名单（口令制）
+#
+# 复制本文件为 config/collect_allowlist.txt（已 gitignore），一行一个口令。
+# 在 /collect 页面填入口令后才能发起 Hermes 采集。
+#   - 空行与 # 起头的整行被忽略；行内 # 之后视为注释；口令两端空白会被裁掉。
+#   - 加白名单 = 加一行；删 = 删一行。按请求读取，改完无需重启，刷新即生效。
+#   - 文件缺失或为空 = 谁都不能采集（fail-closed）。
+#   - 可用环境变量 AISHELF_COLLECT_ALLOWLIST 指向其它路径。
+#
+# 口令自己起，越随机越好，例如：
+yuan-laptop-9f3a2c    # 我的本本
+alice-2k4d8e          # Alice

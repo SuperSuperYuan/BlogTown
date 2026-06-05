@@ -39,6 +39,12 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .hermes-avatar { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #0a84ff, #0a5fff); color: #fff; font-weight: 700; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none; }
 .hermes-head h1 { margin: 0; font-size: 24px; }
 .hermes .lead { margin: 2px 0 0; color: #7b8794; font-size: 14px; }
+.tokenbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; background: #f7f9fc; border: 1px solid #e4e7eb; border-radius: 12px; }
+.tokenbar label { font-size: 13px; font-weight: 600; color: #3e4c59; flex: none; }
+.tokenbar input { flex: 1; min-width: 160px; border: 1px solid #cbd2d9; border-radius: 8px; padding: 7px 11px; font: inherit; outline: none; }
+.tokenbar input:focus { border-color: #0a84ff; box-shadow: 0 0 0 3px rgba(10, 132, 255, .12); }
+.tokenbar input.invalid { border-color: #b00020; box-shadow: 0 0 0 3px rgba(176, 0, 32, .12); }
+.token-hint { color: #9aa5b1; font-size: 12px; flex: none; }
 .chatlog { display: flex; flex-direction: column; gap: 16px; min-height: 200px; max-height: 56vh; overflow-y: auto; background: #fff; border: 1px solid #e4e7eb; border-radius: 16px; padding: 18px; }
 .chatlog:empty { display: none; }
 .msg { display: flex; gap: 10px; align-items: flex-start; }

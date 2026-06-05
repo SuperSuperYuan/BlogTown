@@ -69,6 +69,19 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` — site bind (default `127.0.0.1:8001`).
 - `HERMES_BASE_URL` / `HERMES_API_KEY` / `HERMES_MODEL` — Hermes connection
   (default `http://127.0.0.1:8642/v1`, model `hermes-agent`).
+- `AISHELF_COLLECT_ALLOWLIST` — path to the collect passcode allowlist
+  (default `config/collect_allowlist.txt`).
 
-`config/authors.example.yaml` is a committed template from the earlier design;
-`config/authors.yaml` (if used) is gitignored.
+**Collect access control** (`aishelf.site.allowlist`): `POST /collect/chat` is
+gated by a hand-maintained passcode allowlist so only approved callers can spend
+the (costly) Hermes collection budget — browsing/notes/delete stay open. The
+allowlist is one token per line (`#` comments + blank lines ignored), read **per
+request** (edits apply on refresh, no restart). The `/collect` page takes the
+passcode and sends it as the `X-Collect-Token` header; an unlisted/empty token
+gets a 403 and never touches Hermes. **Fail-closed**: a missing/empty allowlist
+denies everyone. Tokens are plaintext over the LAN — enough to stop accidental
+collection by LAN visitors, not real auth.
+
+`config/authors.example.yaml` and `config/collect_allowlist.example.txt` are
+committed templates; the live `config/authors.yaml` and
+`config/collect_allowlist.txt` are gitignored.
