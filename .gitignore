@@ -9,6 +9,7 @@ venv/
 
 # aishelf runtime artifacts
 config/authors.yaml
+config/collect_allowlist.txt
 data/
 downloads/
 

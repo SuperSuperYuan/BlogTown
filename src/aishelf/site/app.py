@@ -5,15 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+import logging
+
 from aishelf.contract.loader import load_items
-from aishelf.site import collect, hermes, items, notes, views
+from aishelf.site import allowlist, collect, hermes, items, notes, views
 from aishelf.site.config import get_data_dir
+
+logger = logging.getLogger(__name__)
 
 BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -180,7 +184,15 @@ def collect_page(request: Request):
 
 
 @app.post("/collect/chat")
-def collect_chat(req: _ChatRequest):
+def collect_chat(req: _ChatRequest, x_collect_token: str | None = Header(default=None)):
+    # Gate the expensive collection path: only allowlisted tokens may proceed.
+    if not allowlist.is_allowed(x_collect_token):
+        if not allowlist.load_tokens():
+            logger.warning(
+                "采集白名单为空或缺失：在 config/collect_allowlist.txt（或 "
+                "AISHELF_COLLECT_ALLOWLIST 指向的文件）添加口令后才能采集"
+            )
+        raise HTTPException(status_code=403, detail="采集口令无效，请联系管理员加入白名单")
     if not req.messages:
         raise HTTPException(status_code=400, detail="messages 不能为空")
     system = {"role": "system", "content": collect.build_collection_instructions(get_data_dir())}

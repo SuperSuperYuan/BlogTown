@@ -10,6 +10,12 @@
     </div>
   </header>
 
+  <div class="tokenbar">
+    <label for="collecttoken">采集口令</label>
+    <input id="collecttoken" type="password" autocomplete="off" placeholder="输入管理员发放的口令" />
+    <span class="token-hint">采集成本较高，仅白名单口令可发起。</span>
+  </div>
+
   <div id="log" class="chatlog"></div>
 
   <div id="examples" class="examples">
@@ -33,12 +39,20 @@
 </div>
 <script>
 const STORAGE_KEY = "aishelf_collect_history";
+const TOKEN_KEY = "aishelf_collect_token";
 const log = document.getElementById("log");
 const form = document.getElementById("chatform");
 const input = document.getElementById("chatinput");
 const sendBtn = document.getElementById("chatsend");
 const clearBtn = document.getElementById("chatclear");
 const examples = document.getElementById("examples");
+const tokenInput = document.getElementById("collecttoken");
+
+// Persist the collect passcode locally; it gates every /collect/chat call.
+tokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
+tokenInput.addEventListener("input", () => {
+  localStorage.setItem(TOKEN_KEY, tokenInput.value.trim());
+});
 
 function loadHistory() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -109,17 +123,27 @@ async function send(text) {
   try {
     resp = await fetch("/collect/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Collect-Token": (localStorage.getItem(TOKEN_KEY) || "").trim(),
+      },
       body: JSON.stringify({ messages }),
     });
   } catch (e) {
     fail("⚠️ 请求失败：" + e);
     return;
   }
+  if (resp.status === 403) {
+    fail("🔒 采集口令无效，请联系管理员加入白名单。");
+    tokenInput.classList.add("invalid");
+    tokenInput.focus();
+    return;
+  }
   if (!resp.ok || !resp.body) {
     fail("⚠️ 请求失败：HTTP " + resp.status);
     return;
   }
+  tokenInput.classList.remove("invalid");
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
