@@ -55,3 +55,9 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .bubble.typing .dot:nth-child(3) { animation-delay: .3s; }
 @keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
 .bubble.assistant.streaming::after { content: "▋"; margin-left: 1px; color: #9aa5b1; animation: blink 1s steps(1) infinite; }
+.notes { margin-top: 28px; }
+.notes h2 { margin-bottom: 10px; }
+.note-input { width: 100%; min-height: 140px; padding: 12px; border: 1px solid #cbd2d9; border-radius: 10px; font: inherit; line-height: 1.5; resize: vertical; }
+.note-bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.note-status { color: #52606d; font-size: 13px; }
+.note-status.err { color: #b00020; }

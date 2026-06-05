@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from aishelf.contract.loader import load_items
-from aishelf.site import collect, hermes, views
+from aishelf.site import collect, hermes, notes, views
 from aishelf.site.config import get_data_dir
 
 BASE = Path(__file__).parent
@@ -108,7 +108,9 @@ def video_detail(request: Request, item_id: str):
     if item is None:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
-        request, "video_detail.html", {"item": item, "section_url": "/videos"}
+        request,
+        "video_detail.html",
+        {"item": item, "section_url": "/videos", "note": notes.load_note(item.id)},
     )
 
 
@@ -118,7 +120,9 @@ def blog_detail(request: Request, item_id: str):
     if item is None:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
-        request, "blog_detail.html", {"item": item, "section_url": "/blogs"}
+        request,
+        "blog_detail.html",
+        {"item": item, "section_url": "/blogs", "note": notes.load_note(item.id)},
     )
 
 
@@ -171,3 +175,16 @@ def collect_chat(req: _ChatRequest):
     system = {"role": "system", "content": collect.build_collection_instructions(get_data_dir())}
     payload = [system] + [m.model_dump() for m in req.messages]
     return StreamingResponse(hermes.stream_chat(payload), media_type="text/event-stream")
+
+
+class _NoteRequest(BaseModel):
+    text: str
+
+
+@app.post("/notes/{item_id}")
+def save_note_route(item_id: str, req: _NoteRequest):
+    try:
+        updated_at = notes.save_note(item_id, req.text)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid note id")
+    return {"ok": True, "updated_at": updated_at}
