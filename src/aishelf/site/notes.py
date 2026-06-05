@@ -5,26 +5,18 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
 from aishelf.site.config import get_data_dir
+from aishelf.site.items import safe_id
 
 logger = logging.getLogger(__name__)
-
-_SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def notes_dir() -> Path:
     return get_data_dir() / "notes"
-
-
-def _safe_id(item_id: str) -> str:
-    if not item_id or ".." in item_id or "/" in item_id or "\\" in item_id or not _SAFE_ID.match(item_id):
-        raise ValueError(f"unsafe note id: {item_id!r}")
-    return item_id
 
 
 def _now() -> str:
@@ -32,7 +24,7 @@ def _now() -> str:
 
 
 def load_note(item_id: str) -> str:
-    _safe_id(item_id)
+    safe_id(item_id)
     path = notes_dir() / f"{item_id}.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -46,7 +38,7 @@ def load_note(item_id: str) -> str:
 
 
 def save_note(item_id: str, text: str, now=_now) -> str:
-    _safe_id(item_id)
+    safe_id(item_id)
     directory = notes_dir()
     directory.mkdir(parents=True, exist_ok=True)
     updated_at = now()
