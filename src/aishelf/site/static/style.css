@@ -44,4 +44,7 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .chatform input { flex: 1; padding: 11px 14px; border: 1px solid #cbd2d9; border-radius: 10px; font-size: 15px; }
 .chatform button { padding: 11px 20px; border: none; border-radius: 10px; background: #0a84ff; color: #fff; font-size: 15px; cursor: pointer; }
 .chatform button:disabled { opacity: .5; cursor: default; }
+.chattools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.chattools button { background: none; border: 1px solid #cbd2d9; color: #52606d; padding: 5px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.chattools button:hover { border-color: #9aa5b1; color: #1f2933; }
 .resultlinks { display: flex; gap: 10px; margin-top: 14px; }

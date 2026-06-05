@@ -36,6 +36,14 @@ def test_collect_page_renders(client):
     assert "采集" in r.text
 
 
+def test_collect_page_has_history_controls(client):
+    r = client.get("/collect")
+    assert r.status_code == 200
+    # chat history persists in the browser and a manual clear button exists
+    assert "localStorage" in r.text
+    assert "清除对话" in r.text
+
+
 def test_nav_has_collect_link(client):
     r = client.get("/")
     assert r.status_code == 200
