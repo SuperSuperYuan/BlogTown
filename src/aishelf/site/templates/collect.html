@@ -2,42 +2,45 @@
 {% block title %}Hermes · Atlas{% endblock %}
 {% block content %}
 <div class="hermes">
-  <header class="hermes-head">
-    <div class="hermes-avatar">H</div>
-    <div>
-      <h1>Hermes</h1>
-      <p class="lead">用自然语言让 Hermes 去采集视频 / 博客，完成后到下方查看结果。</p>
+  <section class="card hermes-intro">
+    <header class="hermes-head">
+      <div class="hermes-avatar">H</div>
+      <div class="hermes-head-text">
+        <h1>Hermes</h1>
+        <p class="lead">用自然语言让 Hermes 去采集视频 / 博客，完成后到下方查看结果。</p>
+      </div>
+    </header>
+    <div class="tokenbar">
+      <span class="token-lock" aria-hidden="true">🔒</span>
+      <input id="collecttoken" type="password" autocomplete="off" placeholder="采集口令（管理员发放）" />
+      <span class="token-hint">采集成本较高，仅白名单口令可发起。</span>
     </div>
-  </header>
+  </section>
 
-  <div class="tokenbar">
-    <label for="collecttoken">采集口令</label>
-    <input id="collecttoken" type="password" autocomplete="off" placeholder="输入管理员发放的口令" />
-    <span class="token-hint">采集成本较高，仅白名单口令可发起。</span>
-  </div>
+  <section class="card chat-card">
+    <div id="log" class="chatlog"></div>
 
-  <div id="log" class="chatlog"></div>
+    <div id="examples" class="examples">
+      <span class="examples-label">试试：</span>
+      <button type="button" class="chip">爬取 Karpathy 最近的视频</button>
+      <button type="button" class="chip">找几篇关于 AI agent 的博客</button>
+      <button type="button" class="chip">抓 3Blue1Brown 的一个视频</button>
+    </div>
 
-  <div id="examples" class="examples">
-    <span class="examples-label">试试：</span>
-    <button type="button" class="chip">爬取 Karpathy 最近的视频</button>
-    <button type="button" class="chip">找几篇关于 AI agent 的博客</button>
-    <button type="button" class="chip">抓 3Blue1Brown 的一个视频</button>
-  </div>
+    <form id="chatform" class="composer">
+      <textarea id="chatinput" rows="1" placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…"></textarea>
+      <button type="submit" id="chatsend" class="send" title="发送" aria-label="发送">➤</button>
+    </form>
 
-  <form id="chatform" class="composer">
-    <textarea id="chatinput" rows="1" placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…"></textarea>
-    <button type="submit" id="chatsend" class="send" title="发送" aria-label="发送">➤</button>
-  </form>
+    <div class="actionbar">
+      <button id="chatclear" type="button" class="ghost">清除对话</button>
+      <span class="spacer"></span>
+      <a class="textlink" href="/videos">查看视频</a>
+      <a class="textlink" href="/blogs">查看博客</a>
+    </div>
+  </section>
 
-  <div class="actionbar">
-    <button id="chatclear" type="button" class="ghost">清除对话</button>
-    <span class="spacer"></span>
-    <a class="btn" href="/videos">查看视频</a>
-    <a class="btn" href="/blogs">查看博客</a>
-  </div>
-
-  <section class="schedules">
+  <section class="card schedules">
     <h2>定时采集</h2>
     <p class="lead">到点自动重跑采集需求（站点需保持运行；错过的当天任务下次启动时补跑）。新增 / 修改需要上方的采集口令。</p>
 
