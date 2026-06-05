@@ -19,17 +19,15 @@ def _chunk(content):
 class _FakeClient:
     def __init__(self, chunks):
         self._chunks = chunks
+        self.captured = {}
+        parent = self
 
-    class _C:
-        def __init__(self, chunks):
-            self._chunks = chunks
+        class _Completions:
+            def create(self, **kwargs):
+                parent.captured = kwargs
+                return iter(parent._chunks)
 
-        def create(self, **kwargs):
-            return iter(self._chunks)
-
-    @property
-    def chat(self):
-        return SimpleNamespace(completions=self._C(self._chunks))
+        self.chat = SimpleNamespace(completions=_Completions())
 
 
 def test_collect_page_renders(client):
@@ -51,6 +49,20 @@ def test_collect_chat_streams(client, monkeypatch):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/event-stream")
     assert "done writing" in r.text
+
+
+def test_collect_chat_prepends_system_instruction(client, monkeypatch, tmp_path):
+    from aishelf.site import hermes
+    fake = _FakeClient([_chunk("ok")])
+    monkeypatch.setattr(hermes, "get_client", lambda: fake)
+    r = client.post("/collect/chat", json={"messages": [{"role": "user", "content": "爬视频"}]})
+    assert r.status_code == 200
+    sent = fake.captured["messages"]
+    # the collection instruction is prepended as a system message...
+    assert sent[0]["role"] == "system"
+    assert str(tmp_path.resolve()) in sent[0]["content"]  # carries the absolute data dir
+    # ...and the user's message is forwarded after it
+    assert sent[-1] == {"role": "user", "content": "爬视频"}
 
 
 def test_collect_chat_empty_messages_400(client):

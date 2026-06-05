@@ -44,6 +44,11 @@ async function send(text) {
     assistantEl.textContent = "⚠️ 请求失败：" + e;
     return;
   }
+  if (!resp.ok || !resp.body) {
+    assistantEl.classList.add("error");
+    assistantEl.textContent = "⚠️ 请求失败：HTTP " + resp.status;
+    return;
+  }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
