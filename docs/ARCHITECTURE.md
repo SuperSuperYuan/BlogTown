@@ -88,11 +88,6 @@ data/
 | `templates/` | Jinja2 (autoescaped): `base` + page templates + partials (`_video_card`, `_blog_row`, `_pager`, `_keywords`, `_note_editor`, `_delete_button`). |
 | `static/style.css` | All styling (no build step). |
 
-### `aishelf.scraper` — legacy scaffold (unused)
-
-Empty package from the original (superseded) self-built-scraper plan. Safe to
-delete; kept only to avoid churn. See §6.
-
 ---
 
 ## 3. Routes
@@ -175,9 +170,9 @@ browser (the user refreshes).
 - **Local single-user:** note history persistence is per-browser (localStorage
   for the chat); the dev Hermes API key has a committed default in `hermes.py`
   for local convenience — move it to env-only if it's ever a real credential.
-- **Legacy:** `src/aishelf/scraper/` and the M1 spec/plan
-  (`docs/.../2026-05-28-m1-scraper*`) and `CLAUDE.md`'s 3-module overview
-  predate the Hermes pivot and are stale.
+- **Historical:** the M1 spec/plan (`docs/.../2026-05-28-m1-scraper*`) and the
+  Hermes-WebUI spec/plan (`docs/.../2026-06-02-hermes-webui*`) predate the
+  current architecture and are kept only as design history.
 
 ---
 
