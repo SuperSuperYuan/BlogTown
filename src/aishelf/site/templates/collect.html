@@ -4,6 +4,7 @@
 <div class="collect">
   <h1>采集</h1>
   <p class="lead">描述你想采集的内容，例如：爬取 Karpathy 最近的视频。Hermes 会去抓取并写入，完成后到下面查看结果。</p>
+  <div class="chattools"><button id="chatclear" type="button">清除对话</button></div>
   <div id="log" class="chatlog"></div>
   <form id="chatform" class="chatform">
     <input id="chatinput" autocomplete="off" placeholder="输入采集需求…" />
@@ -12,11 +13,22 @@
   <div class="resultlinks"><a class="btn" href="/videos">查看视频</a><a class="btn" href="/blogs">查看博客</a></div>
 </div>
 <script>
+const STORAGE_KEY = "aishelf_collect_history";
 const log = document.getElementById("log");
 const form = document.getElementById("chatform");
 const input = document.getElementById("chatinput");
 const sendBtn = document.getElementById("chatsend");
-const messages = [];
+const clearBtn = document.getElementById("chatclear");
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveHistory() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+}
+
+const messages = loadHistory();
 
 function bubble(cls, text) {
   const el = document.createElement("div");
@@ -27,8 +39,14 @@ function bubble(cls, text) {
   return el;
 }
 
+// Restore prior conversation on load so a refresh keeps the history.
+for (const m of messages) {
+  bubble(m.role === "user" ? "user" : "assistant", m.content);
+}
+
 async function send(text) {
   messages.push({ role: "user", content: text });
+  saveHistory();
   bubble("user", text);
   const assistantEl = bubble("assistant", "");
   let acc = "";
@@ -72,6 +90,7 @@ async function send(text) {
         assistantEl.textContent = "⚠️ " + payload.error;
       } else if (payload.done) {
         messages.push({ role: "assistant", content: acc });
+        saveHistory();
       }
     }
   }
@@ -84,6 +103,13 @@ form.addEventListener("submit", async (e) => {
   input.value = "";
   sendBtn.disabled = true;
   try { await send(text); } finally { sendBtn.disabled = false; input.focus(); }
+});
+
+clearBtn.addEventListener("click", () => {
+  if (messages.length && !confirm("确定清除全部对话历史？")) return;
+  messages.length = 0;
+  localStorage.removeItem(STORAGE_KEY);
+  log.innerHTML = "";
 });
 </script>
 {% endblock %}
