@@ -1,0 +1,28 @@
+# Atlas 定时采集计划
+#
+# 复制本文件为 config/schedules.yaml（已 gitignore），按需增删条目。
+# 站点（python -m aishelf.site）启动时会带起一个后台调度器，每分钟检查一次：
+# 到点且当天还没跑过的计划就执行一次（错过的当天任务会在下次启动时补跑）。
+#
+# 注意：定时任务无人工输入口令，采集白名单不约束它 —— 这个文件本身就是授权，
+# 只有能写文件系统的人才能新增计划。
+#
+# 字段：
+#   name    唯一标识，也用作"上次运行日期"的记录 key
+#   time    每天本地时间，格式 HH:MM
+#   prompt  发给 Hermes 的采集需求（和你在 /collect 页面输入的一样）
+#   enabled 省略默认 true；设 false 可临时停用而不删除
+#
+# 关掉调度器：启动前设环境变量 AISHELF_SCHEDULER_ENABLED=（空）。
+# 换计划文件路径：设 AISHELF_SCHEDULES 指向其它文件。
+
+schedules:
+  - name: karpathy-daily
+    time: "10:00"
+    prompt: 检查 Andrej Karpathy 的 YouTube 最近视频，有新的就采集
+    enabled: true
+
+  - name: ai-blogs-morning
+    time: "08:30"
+    prompt: 找几篇昨天到今天关于 AI agent 的新博客并采集
+    enabled: false
