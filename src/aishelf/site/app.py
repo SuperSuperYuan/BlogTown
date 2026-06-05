@@ -5,12 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from aishelf.contract.loader import load_items
-from aishelf.site import views
+from aishelf.site import collect, hermes, views
 from aishelf.site.config import get_data_dir
 
 BASE = Path(__file__).parent
@@ -147,3 +148,26 @@ def search_page(request: Request, q: str = "", page: int = 1):
             "blogs": views.blogs(page_obj.items),
         },
     )
+
+
+class _Message(BaseModel):
+    role: str
+    content: str
+
+
+class _ChatRequest(BaseModel):
+    messages: list[_Message]
+
+
+@app.get("/collect", response_class=HTMLResponse)
+def collect_page(request: Request):
+    return templates.TemplateResponse(request, "collect.html", {})
+
+
+@app.post("/collect/chat")
+def collect_chat(req: _ChatRequest):
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="messages 不能为空")
+    system = {"role": "system", "content": collect.build_collection_instructions(get_data_dir())}
+    payload = [system] + [m.model_dump() for m in req.messages]
+    return StreamingResponse(hermes.stream_chat(payload), media_type="text/event-stream")

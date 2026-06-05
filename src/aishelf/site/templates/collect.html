@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}采集 · aishelf{% endblock %}
+{% block content %}
+<div class="collect">
+  <h1>采集</h1>
+  <p class="lead">描述你想采集的内容，例如：爬取 Karpathy 最近的视频。Hermes 会去抓取并写入，完成后到下面查看结果。</p>
+  <div id="log" class="chatlog"></div>
+  <form id="chatform" class="chatform">
+    <input id="chatinput" autocomplete="off" placeholder="输入采集需求…" />
+    <button type="submit" id="chatsend">发送</button>
+  </form>
+  <div class="resultlinks"><a class="btn" href="/videos">查看视频</a><a class="btn" href="/blogs">查看博客</a></div>
+</div>
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("chatform");
+const input = document.getElementById("chatinput");
+const sendBtn = document.getElementById("chatsend");
+const messages = [];
+
+function bubble(cls, text) {
+  const el = document.createElement("div");
+  el.className = "bubble " + cls;
+  el.textContent = text;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+async function send(text) {
+  messages.push({ role: "user", content: text });
+  bubble("user", text);
+  const assistantEl = bubble("assistant", "");
+  let acc = "";
+  let resp;
+  try {
+    resp = await fetch("/collect/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    });
+  } catch (e) {
+    assistantEl.classList.add("error");
+    assistantEl.textContent = "⚠️ 请求失败：" + e;
+    return;
+  }
+  if (!resp.ok || !resp.body) {
+    assistantEl.classList.add("error");
+    assistantEl.textContent = "⚠️ 请求失败：HTTP " + resp.status;
+    return;
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const raw = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      if (!raw.startsWith("data: ")) continue;
+      let payload;
+      try { payload = JSON.parse(raw.slice(6)); } catch { continue; }
+      if (payload.delta) {
+        acc += payload.delta;
+        assistantEl.textContent = acc;
+        log.scrollTop = log.scrollHeight;
+      } else if (payload.error) {
+        assistantEl.classList.add("error");
+        assistantEl.textContent = "⚠️ " + payload.error;
+      } else if (payload.done) {
+        messages.push({ role: "assistant", content: acc });
+      }
+    }
+  }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  sendBtn.disabled = true;
+  try { await send(text); } finally { sendBtn.disabled = false; input.focus(); }
+});
+</script>
+{% endblock %}
