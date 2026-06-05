@@ -35,9 +35,19 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .pager { display: flex; gap: 14px; align-items: center; justify-content: center; margin: 24px 0; }
 .pager a { color: #0a84ff; }
 /* ---- Hermes 采集页：卡片分区 ---- */
-.hermes { max-width: 760px; margin: 0 auto; padding-top: 8px; }
+.hermes { max-width: 1140px; margin: 0 auto; padding-top: 8px; }
 .hermes .card { display: block; overflow: visible; background: #fff; border: 1px solid #ececf0; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); padding: 22px 24px; margin-bottom: 20px; }
 .hermes .card:last-child { margin-bottom: 0; }
+/* chat + schedules side by side */
+.hermes-cols { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 20px; align-items: start; }
+.hermes-cols .card { margin-bottom: 0; }
+.hermes-cols .chat-card { display: flex; flex-direction: column; min-height: 460px; }
+.hermes-cols .chat-card .actionbar { margin-top: auto; }
+@media (max-width: 920px) {
+  .hermes { max-width: 760px; }
+  .hermes-cols { grid-template-columns: 1fr; }
+  .hermes-cols .chat-card { min-height: 0; }
+}
 
 /* intro card */
 .hermes-head { display: flex; align-items: center; gap: 14px; }
@@ -93,7 +103,7 @@ h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; } .more { font-s
 .sched-table tbody tr:last-child td { border-bottom: none; }
 .sched-table tbody tr:hover { background: #fafbfc; }
 .sched-time { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-.sched-prompt { color: #3e4c59; max-width: 340px; }
+.sched-prompt { color: #3e4c59; min-width: 150px; }
 .sched-last { color: #9aa5b1; white-space: nowrap; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
 .badge.on { background: #e3f6e9; color: #1a7f37; }
