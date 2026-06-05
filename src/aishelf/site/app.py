@@ -15,12 +15,35 @@ import logging
 import os
 import threading
 from contextlib import asynccontextmanager
+from dataclasses import replace
 
 from aishelf.contract.loader import load_items
-from aishelf.site import allowlist, collect, hermes, items, notes, scheduler, views
+from aishelf.site import (
+    allowlist,
+    collect,
+    hermes,
+    items,
+    notes,
+    schedule_state,
+    scheduler,
+    schedules,
+    views,
+)
 from aishelf.site.config import get_data_dir
 
 logger = logging.getLogger(__name__)
+
+
+def _require_collect_token(token: str | None) -> None:
+    """Gate the costly Hermes paths (collect + schedule mutations) on the
+    passcode allowlist. Raises 403 when the token isn't allowlisted."""
+    if not allowlist.is_allowed(token):
+        if not allowlist.load_tokens():
+            logger.warning(
+                "采集白名单为空或缺失：在 config/collect_allowlist.txt（或 "
+                "AISHELF_COLLECT_ALLOWLIST 指向的文件）添加口令后才能采集"
+            )
+        raise HTTPException(status_code=403, detail="采集口令无效，请联系管理员加入白名单")
 
 BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -195,24 +218,86 @@ class _ChatRequest(BaseModel):
 
 @app.get("/collect", response_class=HTMLResponse)
 def collect_page(request: Request):
-    return templates.TemplateResponse(request, "collect.html", {})
+    return templates.TemplateResponse(
+        request,
+        "collect.html",
+        {"schedules": schedules.load_schedules(), "last_run": schedule_state.load_state(get_data_dir())},
+    )
 
 
 @app.post("/collect/chat")
 def collect_chat(req: _ChatRequest, x_collect_token: str | None = Header(default=None)):
     # Gate the expensive collection path: only allowlisted tokens may proceed.
-    if not allowlist.is_allowed(x_collect_token):
-        if not allowlist.load_tokens():
-            logger.warning(
-                "采集白名单为空或缺失：在 config/collect_allowlist.txt（或 "
-                "AISHELF_COLLECT_ALLOWLIST 指向的文件）添加口令后才能采集"
-            )
-        raise HTTPException(status_code=403, detail="采集口令无效，请联系管理员加入白名单")
+    _require_collect_token(x_collect_token)
     if not req.messages:
         raise HTTPException(status_code=400, detail="messages 不能为空")
     system = {"role": "system", "content": collect.build_collection_instructions(get_data_dir())}
     payload = [system] + [m.model_dump() for m in req.messages]
     return StreamingResponse(hermes.stream_chat(payload), media_type="text/event-stream")
+
+
+class _ScheduleRequest(BaseModel):
+    name: str
+    time: str
+    prompt: str
+    enabled: bool = True
+
+
+@app.post("/schedules")
+def add_schedule(req: _ScheduleRequest, x_collect_token: str | None = Header(default=None)):
+    # Creating a schedule recurs collection on the Hermes budget — same gate.
+    _require_collect_token(x_collect_token)
+    try:
+        name = items.safe_id(req.name)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="名称只能包含字母、数字、点、短横线、下划线")
+    try:
+        hour, minute = schedules._parse_time(req.time)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="时间格式应为 HH:MM")
+    if not req.prompt.strip():
+        raise HTTPException(status_code=400, detail="采集需求不能为空")
+    new = schedules.Schedule(name=name, hour=hour, minute=minute, prompt=req.prompt, enabled=req.enabled)
+    current = schedules.load_schedules()
+    merged, replaced = [], False
+    for s in current:  # upsert by name, preserving position when editing
+        if s.name == name:
+            merged.append(new)
+            replaced = True
+        else:
+            merged.append(s)
+    if not replaced:
+        merged.append(new)
+    schedules.save_schedules(merged)
+    return {"ok": True}
+
+
+@app.post("/schedules/{name}/toggle")
+def toggle_schedule(name: str, x_collect_token: str | None = Header(default=None)):
+    _require_collect_token(x_collect_token)
+    current = schedules.load_schedules()
+    merged, found = [], False
+    for s in current:
+        if s.name == name:
+            merged.append(replace(s, enabled=not s.enabled))
+            found = True
+        else:
+            merged.append(s)
+    if not found:
+        raise HTTPException(status_code=404, detail="未找到该定时任务")
+    schedules.save_schedules(merged)
+    return {"ok": True}
+
+
+@app.post("/schedules/{name}/delete")
+def delete_schedule(name: str, x_collect_token: str | None = Header(default=None)):
+    _require_collect_token(x_collect_token)
+    current = schedules.load_schedules()
+    merged = [s for s in current if s.name != name]
+    if len(merged) == len(current):
+        raise HTTPException(status_code=404, detail="未找到该定时任务")
+    schedules.save_schedules(merged)
+    return {"ok": True}
 
 
 class _NoteRequest(BaseModel):

@@ -99,8 +99,13 @@ writes idempotently by id, "collect if updated" is just re-running the saved
 prompt via `collect.run_once` (non-streaming). Missed runs (machine asleep at
 the time) are caught up on the next tick/startup; a failed run is logged and
 left unrecorded so it retries. `due_schedules` is a pure function (the tested
-core). Scheduled runs bypass the collect passcode (no human to enter it) — the
-config file *is* the authorization.
+core). The scheduled *runs* bypass the collect passcode (no human to enter it).
+Schedules are viewed and edited in the **「定时采集」section of the `/collect`
+page** (list + add/edit/toggle/delete), backed by `POST /schedules`,
+`/schedules/{name}/toggle`, `/schedules/{name}/delete` — these **mutations are
+gated by the collect passcode** (via the shared `_require_collect_token`), since
+creating a schedule recurs collection on the Hermes budget. `schedules.save_schedules`
+writes the YAML atomically, so file edits and the UI share one source of truth.
 
 `config/authors.example.yaml`, `config/collect_allowlist.example.txt`, and
 `config/schedules.example.yaml` are committed templates; the live

@@ -116,6 +116,38 @@ def test_due_catch_up_after_overnight():
     assert schedules.due_schedules([s], state, now) == [s]
 
 
+def test_save_round_trip(tmp_path):
+    f = tmp_path / "s.yaml"
+    scheds = [
+        schedules.Schedule(name="a", hour=10, minute=0, prompt="检查新视频", enabled=True),
+        schedules.Schedule(name="b", hour=8, minute=5, prompt="找博客", enabled=False),
+    ]
+    schedules.save_schedules(scheds, f)
+    out = schedules.load_schedules(f)
+    assert out == scheds
+
+
+def test_save_pads_time(tmp_path):
+    f = tmp_path / "s.yaml"
+    schedules.save_schedules([schedules.Schedule("a", 8, 5, "p", True)], f)
+    text = f.read_text(encoding="utf-8")
+    assert "08:05" in text
+
+
+def test_save_is_atomic_no_tmp(tmp_path):
+    f = tmp_path / "s.yaml"
+    schedules.save_schedules([schedules.Schedule("a", 8, 5, "p", True)], f)
+    assert list(tmp_path.glob("*.tmp")) == []
+    assert f.exists()
+
+
+def test_save_reads_env_path(tmp_path, monkeypatch):
+    f = tmp_path / "env.yaml"
+    monkeypatch.setenv("AISHELF_SCHEDULES", str(f))
+    schedules.save_schedules([schedules.Schedule("e", 7, 0, "p", True)], None)
+    assert [s.name for s in schedules.load_schedules()] == ["e"]
+
+
 def test_due_mixed():
     a = _sched("a", 8, 0)            # past, not run -> due
     b = _sched("b", 23, 0)          # future -> not due

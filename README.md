@@ -65,10 +65,17 @@ check a blogger for new videos and collect them." Because Hermes writes records
 idempotently by id, re-running the prompt simply adds anything new, so there's no
 separate update-detection to configure.
 
-```bash
-cp config/schedules.example.yaml config/schedules.yaml
-# edit it: one entry per schedule (name, time "HH:MM", prompt, enabled)
-```
+You can manage schedules two ways, sharing one `config/schedules.yaml`:
+
+- **From the site** — the **「定时采集」section on the Hermes page** (`/collect`)
+  lists schedules and lets you add / edit / enable / delete them. These changes
+  require the collect passcode (a schedule recurs collection on the Hermes budget).
+- **By editing the file** —
+
+  ```bash
+  cp config/schedules.example.yaml config/schedules.yaml
+  # edit it: one entry per schedule (name, time "HH:MM", prompt, enabled)
+  ```
 
 When you start the site, a background scheduler runs alongside it and fires any
 schedule whose time has passed today and that hasn't run yet today. If the
