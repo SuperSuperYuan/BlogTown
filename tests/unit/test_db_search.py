@@ -1,0 +1,70 @@
+import json
+
+from aishelf.db.search import search
+from aishelf.db.sync import sync
+
+
+def _write(data_dir, sub, item_id, title, summary="摘要", keywords=None):
+    rec = {
+        "id": item_id,
+        "type": "video" if sub == "videos" else "blog",
+        "title": title, "author": "作者甲",
+        "platform": "youtube" if sub == "videos" else "blog",
+        "source_url": f"https://x/{item_id}",
+        "published_at": "2024-01-01", "summary": summary,
+        "keywords": keywords or [], "collected_at": "2024-01-02T00:00:00",
+    }
+    if sub == "videos":
+        rec["thumbnail_url"] = f"https://img/{item_id}.jpg"
+    d = data_dir / sub
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{item_id}.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+
+
+def _seed(tmp_path):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write(data, "videos", "v1", "大语言模型与检索增强生成 RAG")
+    _write(data, "blogs", "b1", "短视频推荐系统")
+    sync(data, db)
+    return db
+
+
+def test_search_cjk_two_char(tmp_path):
+    db = _seed(tmp_path)
+    hits = search(db, "检索")
+    assert [h.id for h in hits] == ["v1"]
+
+
+def test_search_cjk_multichar(tmp_path):
+    db = _seed(tmp_path)
+    assert [h.id for h in search(db, "大语言模型")] == ["v1"]
+
+
+def test_search_ascii_case_insensitive(tmp_path):
+    db = _seed(tmp_path)
+    assert [h.id for h in search(db, "rag")] == ["v1"]
+
+
+def test_search_type_filter(tmp_path):
+    db = _seed(tmp_path)
+    assert search(db, "视频", type="video") == []
+    assert [h.id for h in search(db, "视频", type="blog")] == ["b1"]
+
+
+def test_search_empty_query_returns_empty(tmp_path):
+    db = _seed(tmp_path)
+    assert search(db, "") == []
+    assert search(db, "   ") == []
+
+
+def test_search_no_match_returns_empty(tmp_path):
+    db = _seed(tmp_path)
+    assert search(db, "量子计算") == []
+
+
+def test_search_hit_carries_structured_fields(tmp_path):
+    db = _seed(tmp_path)
+    hit = search(db, "检索")[0]
+    assert hit.type == "video"
+    assert hit.author == "作者甲"
+    assert isinstance(hit.keywords, list)
