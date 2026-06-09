@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from aishelf.db import schema, tokenize
 
+_OR = "or"
+_AND = "and"
 
 @dataclass
 class SearchHit:
@@ -35,9 +37,16 @@ def _hit(row) -> SearchHit:
     )
 
 
-def search(db_path, q, *, type=None, limit: int = 20, offset: int = 0) -> list[SearchHit]:
-    """Ranked full-text hits. Empty query (no tokens) -> []."""
-    match = tokenize.to_match_query(q)
+def search(db_path, q, *, type=None, limit: int = 20, offset: int = 0, mode: str = _AND) -> list[SearchHit]:
+    """Ranked full-text hits. Empty query (no tokens) -> [].
+
+    `mode` controls whether bigrams are ANDed (default, exact) or ORed (lenient,
+    useful for retrieval over conversational questions).
+    """
+    if mode == _OR:
+        match = tokenize.to_match_query_or(q)
+    else:
+        match = tokenize.to_match_query(q)
     if not match:
         return []
     con = schema.connect(db_path)

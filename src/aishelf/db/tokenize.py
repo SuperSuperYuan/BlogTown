@@ -36,3 +36,16 @@ def to_match_query(user_q: str) -> str:
     if not toks:
         return ""
     return " AND ".join(f'"{t}"' for t in toks)
+
+
+def to_match_query_or(user_q: str) -> str:
+    """Build an FTS5 MATCH expression: OR of quoted bigrams. Empty if no tokens.
+
+    More lenient than `to_match_query` — matches if *any* bigram is present.
+    Useful for conversational retrieval where the question contains stop-words
+    or context words that are not in the indexed text.
+    """
+    toks = _segment(user_q)
+    if not toks:
+        return ""
+    return " OR ".join(f'"{t}"' for t in toks)

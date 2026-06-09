@@ -45,8 +45,12 @@ def _note_for(item_id: str) -> str:
 
 
 def retrieve(db_path, question: str, *, k: int = DEFAULT_K) -> list[Source]:
-    """Top-k FTS5 hits for the question, each enriched with its user note."""
-    hits = db_search.search(db_path, question, limit=k)
+    """Top-k FTS5 hits for the question, each enriched with its user note.
+
+    Uses OR-mode search so conversational questions (with stop-words like 什么/是)
+    still match relevant content via shared bigrams.
+    """
+    hits = db_search.search(db_path, question, limit=k, mode="or")
     return [
         Source(
             id=h.id, type=h.type, title=h.title, author=h.author,
