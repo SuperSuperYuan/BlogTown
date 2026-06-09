@@ -101,6 +101,7 @@ with `AISHELF_SCHEDULES=...`.
 |---|---|---|
 | `AISHELF_DATA_DIR` | `data` | Where content + notes are stored |
 | `AISHELF_DB_PATH` | `<data_dir>/atlas.db` | Derived SQLite search index |
+| `ATLAS_CHAT_BASE_URL` / `ATLAS_CHAT_API_KEY` / `ATLAS_CHAT_MODEL` | = the matching `HERMES_*` | Chat model that answers `/ask` questions (defaults to the Hermes connection) |
 | `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` | `127.0.0.1` / `8001` | Site bind address |
 | `AISHELF_COLLECT_ALLOWLIST` | `config/collect_allowlist.txt` | Collect passcode allowlist |
 | `AISHELF_SCHEDULES` | `config/schedules.yaml` | Timed-collection config |
@@ -132,6 +133,20 @@ python -m aishelf.db sync --rebuild   # drop + recreate from scratch
 
 The DB is a rebuildable view of the files — there's no startup or periodic sync
 by design, so run `sync` once after first deploying with existing records.
+
+## Ask your library
+
+`/ask` is a chat that answers questions over your collection — grounded in record
+summaries **and your notes** — and links each answer to its sources. Retrieval
+uses the same FTS5 index as `/api/search`; answers come from a chat model
+configured via `ATLAS_CHAT_*` (defaulting to your Hermes connection, so it works
+with no extra config). It is **ungated** (answering is cheap relative to
+collection) and multi-turn (history lives in your browser). After saving a note,
+the index refreshes so your note becomes searchable.
+
+Because the search index now also covers your notes, an existing deployment must
+run `python -m aishelf.db sync --rebuild` once after upgrading so the new note
+column is populated.
 
 ## Export the contract schema
 
