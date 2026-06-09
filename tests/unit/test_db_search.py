@@ -70,6 +70,15 @@ def test_search_hit_carries_structured_fields(tmp_path):
     assert isinstance(hit.keywords, list)
 
 
+def test_search_rejects_bad_mode(tmp_path):
+    import pytest
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write(data, "videos", "v1", "大语言模型与检索增强生成 RAG")
+    sync(data, db)
+    with pytest.raises(ValueError):
+        search(db, "检索", mode="AND")  # wrong case / unknown mode
+
+
 def test_search_or_mode_matches_where_and_does_not(tmp_path):
     """OR-mode returns a hit when only SOME bigrams are present in the indexed text.
 

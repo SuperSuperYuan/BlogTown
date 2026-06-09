@@ -24,14 +24,14 @@ def get_chat_settings() -> dict[str, str]:
     }
 
 
-def get_client() -> OpenAI:
-    s = get_chat_settings()
+def get_client(settings: dict[str, str] | None = None) -> OpenAI:
+    s = settings or get_chat_settings()
     return OpenAI(base_url=s["base_url"], api_key=s["api_key"], timeout=120.0)
 
 
 def stream_completion(messages: list[dict]) -> Iterator[str]:
     settings = get_chat_settings()
-    client = OpenAI(base_url=settings["base_url"], api_key=settings["api_key"], timeout=120.0)
+    client = get_client(settings)
     model = settings["model"]
     try:
         stream = client.chat.completions.create(model=model, messages=messages, stream=True)

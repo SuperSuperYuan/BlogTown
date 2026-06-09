@@ -70,6 +70,7 @@ def test_ask_chat_streams_answer_and_sources(client, monkeypatch):
     assert "检索增强是…" in r.text     # streamed answer
     assert '"sources"' in r.text       # a sources event was emitted
     assert "v1" in r.text              # the retrieved item id is in the sources payload
+    assert r.text.index('"sources"') < r.text.index('"delta"')  # sources emitted before answer
 
 
 def test_ask_chat_grounds_prompt_on_retrieved_sources(client, monkeypatch):

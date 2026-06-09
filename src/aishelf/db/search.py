@@ -43,6 +43,8 @@ def search(db_path, q, *, type=None, limit: int = 20, offset: int = 0, mode: str
     `mode` controls whether bigrams are ANDed (default, exact) or ORed (lenient,
     useful for retrieval over conversational questions).
     """
+    if mode not in (_AND, _OR):
+        raise ValueError(f"mode must be {_AND!r} or {_OR!r}, got {mode!r}")
     if mode == _OR:
         match = tokenize.to_match_query_or(q)
     else:
