@@ -30,8 +30,9 @@ def get_client() -> OpenAI:
 
 
 def stream_completion(messages: list[dict]) -> Iterator[str]:
-    client = get_client()
-    model = get_chat_settings()["model"]
+    settings = get_chat_settings()
+    client = OpenAI(base_url=settings["base_url"], api_key=settings["api_key"], timeout=120.0)
+    model = settings["model"]
     try:
         stream = client.chat.completions.create(model=model, messages=messages, stream=True)
         for chunk in stream:
