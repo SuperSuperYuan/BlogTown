@@ -28,6 +28,7 @@ See **`docs/ARCHITECTURE.md`** for the full architecture.
 - Install with dev deps: `pip install -e ".[dev]"`
 - Run the site: `python -m aishelf.site` (default `:8001`; `AISHELF_DATA_DIR` defaults to `data`)
 - Export the contract JSON Schema: `python -m aishelf.contract.schema`
+- Backfill/rebuild the derived DB: `python -m aishelf.db sync` (`--rebuild` to drop+recreate)
 - Run tests (network skipped by default): `pytest`
 - Run including network smoke tests: `pytest -m ""`
 - Run a single test: `pytest tests/unit/test_site_views.py::test_name -v`
@@ -47,6 +48,12 @@ Source layout uses a `src/` directory; package is `aishelf`.
   (config load + pure `due_schedules`), `schedule_state.py` (last-run dates),
   `scheduler.py` (background `run_due_now` loop), `templates/`, `static/`,
   `__main__.py`.
+- `aishelf/db/` — derived SQLite index of the contract files: `config.py`
+  (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
+  `connect`/`init_db`), `tokenize.py` (CJK bigram `bigrams`/`to_match_query`),
+  `sync.py` (idempotent `sync` — upsert + prune), `search.py` (`search` over
+  FTS5), `__main__.py` (CLI). The DB is a rebuildable view; files stay the
+  source of truth.
 
 **Data & storage** (`data/`, gitignored):
 
@@ -57,6 +64,16 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - **Atomic writes** (`.tmp` + rename) and **id sanitization** (`items.safe_id`,
   the single path-safety choke point) everywhere data is persisted.
 - The loader/site **skip and log** a malformed record rather than crashing.
+
+**Derived DB** (`aishelf.db`): a SQLite file (`<data_dir>/atlas.db`, gitignored)
+holding a structured mirror of the contract records plus a bigram FTS5 index for
+CJK full-text search. It is a **derived view** — files remain the source of
+truth and the DB is rebuildable at any time (`python -m aishelf.db sync`). It is
+synced after each collection (scheduled runs, and off-thread after manual chat
+collection). The read-only `GET /api/search?q=&type=&page=` endpoint queries it;
+existing browse/search pages still read files. Initial deployment must run one
+`python -m aishelf.db sync` to backfill existing records (no startup/periodic
+sync by design).
 
 **Key conventions**
 
@@ -70,6 +87,7 @@ Source layout uses a `src/` directory; package is `aishelf`.
 ## Config
 
 - `AISHELF_DATA_DIR` — where content/notes live (default `data`).
+- `AISHELF_DB_PATH` — derived SQLite DB file (default `<data_dir>/atlas.db`).
 - `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` — site bind (default `127.0.0.1:8001`).
 - `HERMES_BASE_URL` / `HERMES_API_KEY` / `HERMES_MODEL` — Hermes connection
   (default `http://127.0.0.1:8642/v1`, model `hermes-agent`).
