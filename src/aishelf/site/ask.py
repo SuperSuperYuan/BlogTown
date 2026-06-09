@@ -28,10 +28,12 @@ class Source:
 
 
 def latest_user_question(messages: list[dict]) -> str:
-    """The most recent user message's content, or '' if there is none."""
+    """The most recent user message's content as a string, or '' if there is
+    none (also coerces a missing / None / non-string content to '')."""
     for m in reversed(messages):
         if m.get("role") == "user":
-            return m.get("content", "")
+            content = m.get("content")
+            return content if isinstance(content, str) else ""
     return ""
 
 

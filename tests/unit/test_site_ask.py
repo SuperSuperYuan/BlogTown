@@ -16,8 +16,13 @@ def test_latest_user_question_returns_last_user_message():
     assert ask.latest_user_question(msgs) == "第二问"
 
 
-def test_latest_user_question_empty_when_none():
+def test_latest_user_question_empty_when_no_user_role():
     assert ask.latest_user_question([{"role": "assistant", "content": "x"}]) == ""
+
+
+def test_latest_user_question_empty_when_content_none():
+    # OpenAI messages may carry content: None (e.g. tool-call turns); must not return None
+    assert ask.latest_user_question([{"role": "user", "content": None}]) == ""
 
 
 def test_build_messages_includes_numbered_sources_note_and_guard():
