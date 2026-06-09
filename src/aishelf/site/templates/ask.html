@@ -87,10 +87,12 @@ function renderSources(afterEl, sources) {
     const a = document.createElement("a");
     a.className = "source-link";
     a.href = (s.type === "video" ? "/videos/" : "/blogs/") + encodeURIComponent(s.id);
+    a.target = "_blank";
+    a.rel = "noopener";
     a.textContent = "[" + (i + 1) + "] " + s.title + " — " + s.author;
     box.appendChild(a);
   });
-  afterEl.insertAdjacentElement("afterend", box);
+  (afterEl.parentElement || afterEl).insertAdjacentElement("afterend", box);
 }
 
 function updateExamples() {
