@@ -23,6 +23,13 @@ Data lives on disk under `data/` (gitignored): `data/videos/<id>.json`,
 site loads `data/` **per request**, so new Hermes output shows up on refresh
 with no restart.
 
+A derived **SQLite + FTS5** index (`data/atlas.db`, also gitignored) mirrors the
+contract files and powers CJK-aware full-text search via the read-only
+`GET /api/search` endpoint. It's a rebuildable **view** — files stay the source
+of truth — synced after each collection and backfillable with
+`python -m aishelf.db sync`. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+for details.
+
 ## Quick start
 
 ```bash
@@ -93,6 +100,7 @@ with `AISHELF_SCHEDULES=...`.
 | Env var | Default | Purpose |
 |---|---|---|
 | `AISHELF_DATA_DIR` | `data` | Where content + notes are stored |
+| `AISHELF_DB_PATH` | `<data_dir>/atlas.db` | Derived SQLite search index |
 | `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` | `127.0.0.1` / `8001` | Site bind address |
 | `AISHELF_COLLECT_ALLOWLIST` | `config/collect_allowlist.txt` | Collect passcode allowlist |
 | `AISHELF_SCHEDULES` | `config/schedules.yaml` | Timed-collection config |
@@ -110,6 +118,20 @@ AISHELF_SITE_HOST=0.0.0.0 python -m aishelf.site
 Then open `http://<your-LAN-ip>:8001` from another device. The site has no real
 authentication beyond the collect passcode — keep it on a trusted LAN, not the
 public internet.
+
+## Search index
+
+`GET /api/search?q=&type=&page=` serves CJK-aware full-text search from a derived
+SQLite + FTS5 index. It's synced automatically after each collection. On a fresh
+deploy (or after editing files by hand), backfill or rebuild it:
+
+```bash
+python -m aishelf.db sync             # upsert new/changed records, prune deleted
+python -m aishelf.db sync --rebuild   # drop + recreate from scratch
+```
+
+The DB is a rebuildable view of the files — there's no startup or periodic sync
+by design, so run `sync` once after first deploying with existing records.
 
 ## Export the contract schema
 
@@ -136,4 +158,5 @@ under the `network` marker.
 - Architecture overview: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Design specs and implementation plans: `docs/superpowers/specs/` and
   `docs/superpowers/plans/` (one pair per feature — contract, display site,
-  collect page, notes, delete, collect allowlist).
+  collect page, notes, delete, collect allowlist, scheduled collection,
+  derived SQLite DB).
