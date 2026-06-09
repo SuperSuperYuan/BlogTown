@@ -18,6 +18,9 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 
 from aishelf.contract.loader import load_items
+from aishelf.db import search as db_search
+from aishelf.db import sync as db_sync
+from aishelf.db.config import default_db_path
 from aishelf.site import (
     allowlist,
     collect,
@@ -231,9 +234,25 @@ def collect_chat(req: _ChatRequest, x_collect_token: str | None = Header(default
     _require_collect_token(x_collect_token)
     if not req.messages:
         raise HTTPException(status_code=400, detail="messages 不能为空")
-    system = {"role": "system", "content": collect.build_collection_instructions(get_data_dir())}
+    data_dir = get_data_dir()
+    system = {"role": "system", "content": collect.build_collection_instructions(data_dir)}
     payload = [system] + [m.model_dump() for m in req.messages]
-    return StreamingResponse(hermes.stream_chat(payload), media_type="text/event-stream")
+    stream = hermes.stream_chat(payload)
+
+    def _with_sync():
+        try:
+            yield from stream
+        finally:
+            # Hermes wrote files during the turn; refresh the derived DB off-thread
+            # so it never blocks or breaks the SSE response.
+            def _bg():
+                try:
+                    db_sync.sync(data_dir, default_db_path(data_dir))
+                except Exception as exc:  # derived DB; recoverable
+                    logger.warning("DB sync after chat collection failed: %s", exc)
+            threading.Thread(target=_bg, name="aishelf-chat-sync", daemon=True).start()
+
+    return StreamingResponse(_with_sync(), media_type="text/event-stream")
 
 
 class _ScheduleRequest(BaseModel):

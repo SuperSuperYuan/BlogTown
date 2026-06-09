@@ -133,3 +133,24 @@ def test_collect_chat_denied_when_allowlist_missing(monkeypatch, tmp_path):
         headers={"X-Collect-Token": "anything"},
     )
     assert r.status_code == 403
+
+
+def test_collect_chat_triggers_db_sync(client, monkeypatch):
+    import threading
+
+    from aishelf.site import hermes
+    from aishelf.db import sync as db_sync
+
+    monkeypatch.setattr(hermes, "get_client", lambda: _FakeClient([_chunk("written")]))
+
+    done = threading.Event()
+    monkeypatch.setattr(db_sync, "sync", lambda data_dir, db_path: done.set())
+
+    r = client.post(
+        "/collect/chat",
+        json={"messages": [{"role": "user", "content": "爬视频"}]},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert "written" in r.text  # stream fully consumed
+    assert done.wait(timeout=5)  # background sync ran after the stream
