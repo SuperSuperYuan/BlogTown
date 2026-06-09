@@ -110,9 +110,9 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 |---|---|
 | `config.py` | `default_db_path(data_dir)` ← `AISHELF_DB_PATH` (default `<data_dir>/atlas.db`). |
 | `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author/**note**). The `note` column lets `/ask` and `/api/search` reach into your own annotations. Existing deployments must run `python -m aishelf.db sync --rebuild` once to populate the new column. |
-| `tokenize.py` | `bigrams`/`to_match_query` — CJK bigram tokenization so Chinese text is searchable without word segmentation. |
-| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file, prune rows whose file is gone. Pure-ish over the loader. |
-| `search.py` | `search(db_path, q, type, page)` — FTS5 query → structured hits (id/type/title/score), paginated. |
+| `tokenize.py` | `bigrams`/`to_match_query` (AND) + `to_match_query_or` (OR) — CJK bigram tokenization so Chinese text is searchable without word segmentation. |
+| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file (incl. its note text), prune rows whose file is gone. Pure-ish over the loader. |
+| `search.py` | `search(db_path, q, *, type=None, limit, offset, mode="and")` — FTS5 query → structured hits, paginated; `mode="or"` is the lenient retrieval path used by `/ask`. |
 | `__main__.py` | `python -m aishelf.db sync [--rebuild]` (backfill / drop+recreate). |
 
 ---
