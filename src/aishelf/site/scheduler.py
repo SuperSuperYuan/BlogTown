@@ -14,6 +14,8 @@ import logging
 import threading
 from datetime import datetime
 
+from aishelf.db import sync as db_sync
+from aishelf.db.config import default_db_path
 from aishelf.site import collect, schedule_state, schedules
 from aishelf.site.config import get_data_dir
 
@@ -43,6 +45,12 @@ def run_due_now(now: datetime | None = None) -> list[str]:
         schedule_state.save_state(data_dir, state)
         ran.append(s.name)
         logger.info("scheduled collection %r ran: %s", s.name, summary)
+    if ran:
+        try:
+            summary = db_sync.sync(data_dir, default_db_path(data_dir))
+            logger.info("DB synced after scheduled collection: %s", summary)
+        except Exception as exc:  # derived DB; failure is recoverable, never fatal
+            logger.warning("DB sync after scheduled collection failed: %s", exc)
     return ran
 
 
