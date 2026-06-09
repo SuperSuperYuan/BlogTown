@@ -114,3 +114,14 @@ def test_sync_reindexes_when_note_changes(tmp_path):
     con = schema.connect(db)
     fts = con.execute("SELECT item_id FROM items_fts WHERE items_fts MATCH '\"强化\"'").fetchall()
     assert [r[0] for r in fts] == ["v1"]
+
+
+def test_sync_tolerates_non_dict_note_json(tmp_path):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write(data, "videos", "v1")
+    notes = data / "notes"
+    notes.mkdir(parents=True, exist_ok=True)
+    (notes / "v1.json").write_text("[]", encoding="utf-8")  # valid JSON, not a dict
+    summary = sync(data, db)  # must not raise
+    assert summary.added == 1
+    assert set(_rows(db)) == {"v1"}

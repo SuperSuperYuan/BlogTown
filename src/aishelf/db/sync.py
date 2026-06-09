@@ -41,9 +41,10 @@ def _note_text(data_dir, item_id: str) -> str:
     (not the env) so sync stays self-contained on its argument."""
     path = Path(data_dir) / "notes" / f"{item_id}.json"
     try:
-        return json.loads(path.read_text(encoding="utf-8")).get("text", "")
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return ""
+    return data.get("text", "") if isinstance(data, dict) else ""
 
 
 def _content_hash(item, note: str = "") -> str:
