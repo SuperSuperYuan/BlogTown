@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_items_type      ON items(type);
 CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at DESC);
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   item_id UNINDEXED,
-  title, summary, keywords, author,
+  title, summary, keywords, author, note,
   tokenize='unicode61'
 );
 """

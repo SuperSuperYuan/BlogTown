@@ -82,3 +82,35 @@ def test_sync_skips_malformed(tmp_path):
     summary = sync(data, db)
     assert summary.added == 1
     assert set(_rows(db)) == {"v1"}
+
+
+def _write_note(data_dir, item_id, text):
+    d = data_dir / "notes"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{item_id}.json").write_text(
+        json.dumps({"id": item_id, "text": text, "updated_at": "2024-01-03T00:00:00"}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def test_sync_indexes_note_text_for_search(tmp_path):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    # summary deliberately does NOT contain the term that's only in the note
+    _write(data, "videos", "v1", summary="一段普通的摘要")
+    _write_note(data, "v1", "里面讲到了向量数据库")
+    sync(data, db)
+    con = schema.connect(db)
+    fts = con.execute("SELECT item_id FROM items_fts WHERE items_fts MATCH '\"向量\"'").fetchall()
+    assert [r[0] for r in fts] == ["v1"]
+
+
+def test_sync_reindexes_when_note_changes(tmp_path):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write(data, "videos", "v1", summary="普通摘要")
+    sync(data, db)  # no note yet
+    _write_note(data, "v1", "新增了关于强化学习的笔记")
+    summary = sync(data, db)
+    assert summary.updated == 1  # note change marks the item as updated
+    con = schema.connect(db)
+    fts = con.execute("SELECT item_id FROM items_fts WHERE items_fts MATCH '\"强化\"'").fetchall()
+    assert [r[0] for r in fts] == ["v1"]
