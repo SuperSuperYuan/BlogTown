@@ -15,7 +15,7 @@ import logging
 import os
 import threading
 from contextlib import asynccontextmanager
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 from aishelf.contract.loader import load_items
 from aishelf.db import search as db_search
@@ -55,6 +55,7 @@ VIDEOS_PER_PAGE = 16
 BLOGS_PER_PAGE = 10
 SEARCH_PER_PAGE = 20
 HOME_PREVIEW = 8
+SEARCH_API_PER_PAGE = 20
 
 
 def _fmt_duration(seconds) -> str:
@@ -341,3 +342,16 @@ def delete_item_route(item_id: str):
     if not removed:
         raise HTTPException(status_code=404, detail="not found")
     return {"ok": True}
+
+
+@app.get("/api/search")
+def api_search(q: str = "", type: str | None = None, page: int = 1):
+    """Read-only full-text search over the derived DB (first consumption feature)."""
+    if type not in (None, "video", "blog"):
+        raise HTTPException(status_code=400, detail="type 只能是 video 或 blog")
+    data_dir = get_data_dir()
+    offset = max(0, page - 1) * SEARCH_API_PER_PAGE
+    hits = db_search.search(
+        default_db_path(data_dir), q, type=type, limit=SEARCH_API_PER_PAGE, offset=offset
+    )
+    return {"q": q, "type": type, "page": page, "results": [asdict(h) for h in hits]}
