@@ -1,7 +1,7 @@
 # Atlas — Architecture Summary
 
 **Status:** MVP + collection access control + scheduling + derived SQLite
-search DB + ask-your-library RAG chat (2026-06-09). 198 tests passing.
+search DB + ask-your-library RAG chat (2026-06-09). 223 tests passing.
 
 Atlas is a personal, local web app for collecting and browsing AI-domain content
 (interview/technical-talk **videos** and **blog/document** articles) from across
@@ -86,7 +86,7 @@ data/
 | `views.py` | Pure functions over `list[ContentItem]`: `videos`/`blogs` split, `search`, `by_keyword`, `by_author`/`author_key`, `paginate` (+ `Page`). No I/O — fully unit-tested. |
 | `hermes.py` | Hermes connection (`HERMES_BASE_URL`/`_API_KEY`/`_MODEL`) + `stream_chat` — robust SSE: skips empty/`None` chunks, turns any error into an SSE error event (never breaks the stream). API key is env-only (no committed default). |
 | `collect.py` | `build_collection_instructions(data_dir)` — the system prompt that tells Hermes the absolute data path, id/atomic-write rules, content rules, and embeds the JSON Schema. `run_once(prompt)` — a non-streaming collection call used by the scheduler. |
-| `ask.py` | RAG core for `/ask` (pure): `retrieve` (FTS5 hits + each item's note), `build_messages` (grounded system prompt: numbered sources, `[n]` citations, no-source guard), `source_refs`, `latest_user_question`. |
+| `ask.py` | RAG core for `/ask` (pure): `retrieve` (FTS5 hits + each item's note), `build_messages` (grounded system prompt: numbered sources, `[n]` citations, no-source guard), `source_refs`, `latest_user_question`. Also `nav_types`/`nav_candidates`/`nav_refs` (content jump-cards on explicit open/view intent) and `is_low_confidence` (empty/low-overlap → collect guide). |
 | `llm.py` | Chat-model connection for answering (`ATLAS_CHAT_*`, defaulting to Hermes) + robust `stream_completion` (reuses `hermes.sse`). |
 | `allowlist.py` | Collect passcode gate: `load_tokens`/`is_allowed` over `config/collect_allowlist.txt` (one token per line, `#` comments). Read per request; **fail-closed** (missing/empty ⇒ nobody). |
 | `schedules.py` | `Schedule` model + `load_schedules`/`save_schedules` (atomic YAML at `config/schedules.yaml`) + `due_schedules(schedules, state, now)` — the pure "what should run now" function. |
@@ -126,10 +126,10 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | `GET /videos/{id}`, `GET /blogs/{id}` | Detail (embed/cover, summary, keywords, **note editor**, **delete button**) |
 | `GET /authors/{key}` | An author's videos + blogs |
 | `GET /search?q=` | Cross-modality search page, grouped by type (reads files) |
-| `GET /api/search?q=&type=&page=` | Read-only JSON search over the derived DB (FTS5) — `{hits, page, ...}` |
+| `GET /api/search?q=&type=&page=` | Read-only JSON search over the derived DB (FTS5) — `{q, type, page, results}` |
 | `GET /ask` | Ask-your-library chat page (ungated; per-browser history). |
-| `POST /ask/chat` | SSE: retrieve over `atlas.db` (summaries + notes), stream a grounded answer, plus a `{sources}` event for the linked Sources panel. **Ungated.** |
-| `GET /collect` | **Hermes** chat page + the 「定时采集」schedule section (list + form) |
+| `POST /ask/chat` | SSE: `{sources}`, then optionally `{jump}` (open-intent jump-cards) or `{collect}` (empty→collect guide; takes precedence), then the streamed answer. **Ungated.** |
+| `GET /collect` | **Hermes** chat page + the 「定时采集」schedule section; `?q=` pre-fills the collection composer. |
 | `POST /collect/chat` | SSE proxy: prepends the collection instruction, streams Hermes. **Gated** by the collect passcode (`X-Collect-Token`) |
 | `POST /schedules` | Create/edit (upsert by name) a schedule. **Gated** (400 bad name/time/empty prompt) |
 | `POST /schedules/{name}/toggle` | Enable/disable a schedule. **Gated** (404 unknown) |
@@ -169,7 +169,7 @@ otherwise `403`. Browsing, notes, and delete are not gated.
   questions match), builds a grounded prompt (numbered sources, citation +
   no-hallucination rules), streams the answer from the `ATLAS_CHAT_*` model, and
   emits a `{sources}` event the page renders as links. Saving a note re-syncs the
-  index so notes are searchable.
+  index so notes are searchable. When the turn reads as an explicit open/view request the answer also carries `{jump}` cards to detail pages; when nothing relevant is found it carries a `{collect}` guide to `/collect?q=<question>` (low-confidence is checked first and suppresses jump-cards).
 - **Note:** detail page prefills the saved note; saving POSTs to `/notes/{id}` →
   atomic write under `data/notes/`. Independent of the content record.
 - **Delete:** confirm → `POST /delete/{id}` → `items.delete_item` unlinks the
@@ -206,7 +206,7 @@ otherwise `403`. Browsing, notes, and delete are not gated.
 pip install -e ".[dev]"
 python -m aishelf.site        # Atlas site + scheduler, default :8001 (AISHELF_DATA_DIR=data)
 python -m aishelf.db sync     # backfill/refresh the derived DB (--rebuild to recreate)
-pytest                        # 198 tests; network tests deselected by default
+pytest                        # 223 tests; network tests deselected by default
 ```
 
 Hermes must be running (default `http://127.0.0.1:8642/v1`) for collection to

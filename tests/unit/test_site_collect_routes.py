@@ -154,3 +154,31 @@ def test_collect_chat_triggers_db_sync(client, monkeypatch):
     assert r.status_code == 200
     assert "written" in r.text  # stream fully consumed
     assert done.wait(timeout=5)  # background sync ran after the stream
+
+
+def test_collect_page_prefills_q(client):
+    r = client.get("/collect", params={"q": "量子计算 视频"})
+    assert r.status_code == 200
+    assert "量子计算 视频" in r.text  # pre-filled into the composer textarea
+
+
+def test_collect_page_no_q_is_blank(client):
+    r = client.get("/collect")
+    assert r.status_code == 200
+    # composer renders with no prefilled text between the textarea tags
+    assert 'placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…"></textarea>' in r.text
+
+
+def test_collect_page_q_is_html_escaped(client):
+    r = client.get("/collect", params={"q": "<script>alert(1)</script>"})
+    assert r.status_code == 200
+    # Extract only the textarea element that holds the prefill value.
+    # The template renders: <textarea id="chatinput" ...>{{ prefill }}</textarea>
+    # on a single line, so we can isolate it to avoid false positives from the
+    # page's own <script> blocks.
+    textarea_line = next(
+        (line for line in r.text.splitlines() if 'id="chatinput"' in line), None
+    )
+    assert textarea_line is not None, "chatinput textarea not found in response"
+    assert "<script>" not in textarea_line          # not injected raw
+    assert "&lt;script&gt;" in textarea_line         # autoescaped

@@ -7,12 +7,24 @@ that forbids answering outside the provided sources. No LLM or HTTP here.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from aishelf.db import search as db_search
+from aishelf.db import tokenize
 from aishelf.site import notes
 
 DEFAULT_K = 6
+NAV_MAX = 5
+RELEVANCE_FLOOR = 0.15
+
+_CJK_NAV_VERBS = (
+    "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看", "打开看",
+)
+# ASCII verbs need word boundaries so "play" doesn't match inside "display"/"replay".
+_ASCII_NAV_RE = re.compile(r"\b(?:open|play|watch|go to)\b")
+_VIDEO_CUES = ("视频", "video")
+_BLOG_CUES = ("博客", "文章", "帖子", "blog", "article", "post")
 
 
 @dataclass
@@ -67,6 +79,57 @@ def source_refs(sources: list[Source]) -> list[dict]:
         {"id": s.id, "type": s.type, "title": s.title, "author": s.author}
         for s in sources
     ]
+
+
+def nav_types(question: str) -> set[str]:
+    """The {video, blog} subset the user explicitly asks to open/view.
+
+    A modality is included iff (any nav verb) AND (that modality's cue) appears.
+    Empty set means no navigation intent. ASCII matching is case-insensitive;
+    CJK is unaffected by lower().
+    """
+    q = (question or "").lower()
+    if not (any(v in q for v in _CJK_NAV_VERBS) or _ASCII_NAV_RE.search(q)):
+        return set()
+    types: set[str] = set()
+    if any(c in q for c in _VIDEO_CUES):
+        types.add("video")
+    if any(c in q for c in _BLOG_CUES):
+        types.add("blog")
+    return types
+
+
+def nav_candidates(sources: list[Source], types: set[str]) -> list[Source]:
+    """Sources whose type is requested, in retrieval order, capped at NAV_MAX."""
+    if not types:
+        return []
+    return [s for s in sources if s.type in types][:NAV_MAX]
+
+
+def nav_refs(candidates: list[Source]) -> list[dict]:
+    """Card payload for the client (links + label decided client-side by type)."""
+    return [
+        {"id": s.id, "type": s.type, "title": s.title, "author": s.author,
+         "platform": s.platform}
+        for s in candidates
+    ]
+
+
+def is_low_confidence(question: str, sources: list[Source]) -> bool:
+    """True when the library has nothing relevant: no sources, or the top source
+    shares fewer than RELEVANCE_FLOOR of the question's bigrams. Pure heuristic —
+    empty retrieval is the primary signal, overlap is a conservative secondary
+    catch for loose OR-mode matches."""
+    if not sources:
+        return True
+    q_bigrams = set(tokenize.bigrams(question).split())
+    if not q_bigrams:
+        return True
+    top = sources[0]
+    text = " ".join([top.title, top.summary, " ".join(top.keywords), top.author, top.note])
+    s_bigrams = set(tokenize.bigrams(text).split())
+    overlap = len(q_bigrams & s_bigrams) / len(q_bigrams)
+    return overlap < RELEVANCE_FLOOR
 
 
 _RULES = (
