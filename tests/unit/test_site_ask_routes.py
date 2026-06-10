@@ -97,3 +97,58 @@ def test_ask_chat_is_ungated(client, monkeypatch):
     r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "hi"}]})
     assert r.status_code == 200
     assert "ans" in r.text
+
+
+def test_ask_chat_video_navigation_emits_jump(client, monkeypatch):
+    from aishelf.site import llm
+    monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("ok")]))
+    r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "打开 大语言模型 视频"}]})
+    assert r.status_code == 200
+    assert '"jump"' in r.text
+    assert '"type": "video"' in r.text
+    assert "v1" in r.text
+    assert '"collect"' not in r.text
+    assert r.text.index('"jump"') < r.text.index('"delta"')
+
+
+def test_ask_chat_blog_navigation_emits_jump(client, tmp_path, monkeypatch):
+    _write(tmp_path, "blogs", "b1", "RAG 实践指南")  # unrelated to the video
+    from aishelf.db.sync import sync
+    sync(tmp_path, tmp_path / "atlas.db")
+    from aishelf.site import llm
+    monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("ok")]))
+    r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "打开那篇 RAG 博客"}]})
+    assert r.status_code == 200
+    assert '"jump"' in r.text
+    assert '"type": "blog"' in r.text
+    assert "b1" in r.text
+
+
+def test_ask_chat_ordinary_question_no_jump_no_collect(client, monkeypatch):
+    from aishelf.site import llm
+    monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("检索增强是…")]))
+    r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "什么是检索增强"}]})
+    assert r.status_code == 200
+    assert '"jump"' not in r.text
+    assert '"collect"' not in r.text
+
+
+def test_ask_chat_no_match_emits_collect(client, monkeypatch):
+    from aishelf.site import llm
+    monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("没有相关内容")]))
+    r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "量子计算最新进展"}]})
+    assert r.status_code == 200
+    assert '"collect"' in r.text
+    assert "量子计算最新进展" in r.text          # the question is carried for prefill
+    assert '"jump"' not in r.text
+    assert r.text.index('"collect"') < r.text.index('"delta"')
+
+
+def test_ask_chat_low_confidence_takes_precedence_over_jump(client, monkeypatch):
+    # nav intent (打开...视频) but no matching content -> collect, NOT jump
+    from aishelf.site import llm
+    monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("ok")]))
+    r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "打开关于量子计算的视频"}]})
+    assert r.status_code == 200
+    assert '"collect"' in r.text
+    assert '"jump"' not in r.text

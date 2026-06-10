@@ -281,6 +281,14 @@ def ask_chat(req: _ChatRequest):
     def _gen():
         # Emit the sources first so the client can render the panel immediately.
         yield hermes.sse({"sources": ask.source_refs(sources)})
+        # Low confidence (empty / loose match) takes precedence: guide to collect
+        # and suppress jump-cards. Otherwise, surface navigation jump-cards.
+        if ask.is_low_confidence(question, sources):
+            yield hermes.sse({"collect": {"q": question}})
+        else:
+            candidates = ask.nav_candidates(sources, ask.nav_types(question))
+            if candidates:
+                yield hermes.sse({"jump": ask.nav_refs(candidates)})
         yield from llm.stream_completion(payload)
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
