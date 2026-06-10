@@ -140,13 +140,18 @@ def sync(data_dir, db_path=None) -> SyncSummary:
 
         if to_embed and embed_model:
             vectors = embed.embed_texts([_embed_text(it, note) for it, note in to_embed])
-            if vectors:
+            if vectors and len(vectors) == len(to_embed):
                 for (it, _note), vec in zip(to_embed, vectors):
                     con.execute(
                         "UPDATE items SET embedding=?, embedding_model=?, embedding_dim=? "
                         "WHERE id=?",
                         (vector.pack(vec), embed_model, len(vec), it.id),
                     )
+            elif vectors:
+                logger.warning(
+                    "embed_texts returned %d vectors for %d texts; skipping embedding update",
+                    len(vectors), len(to_embed),
+                )
 
         stale = [i for i in existing if i not in seen]
         for rid in stale:

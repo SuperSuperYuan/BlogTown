@@ -207,3 +207,16 @@ def test_sync_embedding_failure_leaves_row_without_crash(tmp_path, monkeypatch):
     summary = sync(data, db)          # must not raise
     assert summary.added == 1
     assert _embedding_row(db, "v1")["embedding"] is None
+
+
+def test_sync_skips_embedding_on_vector_count_mismatch(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0]])  # too few (1 for 2)
+    summary = sync(data, db)  # must not raise
+    assert summary.added == 2
+    assert _embedding_row(db, "v1")["embedding"] is None
+    assert _embedding_row(db, "v2")["embedding"] is None
