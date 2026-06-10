@@ -1,6 +1,7 @@
 import json
 
-from aishelf.db import schema
+from aishelf import embed
+from aishelf.db import schema, vector
 from aishelf.db.sync import sync
 
 
@@ -125,3 +126,84 @@ def test_sync_tolerates_non_dict_note_json(tmp_path):
     summary = sync(data, db)  # must not raise
     assert summary.added == 1
     assert set(_rows(db)) == {"v1"}
+
+
+# ---------------------------------------------------------------------------
+# Embedding tests (Task 6)
+# ---------------------------------------------------------------------------
+
+def _write_video(data_dir, vid, summary="普通摘要"):
+    (data_dir / "videos").mkdir(parents=True, exist_ok=True)
+    rec = {"id": vid, "type": "video", "title": "标题", "author": "作者甲",
+           "platform": "youtube", "source_url": f"https://x/{vid}",
+           "published_at": "2024-01-01", "summary": summary, "keywords": [],
+           "collected_at": "2024-01-02T00:00:00", "thumbnail_url": "https://img/x.jpg"}
+    (data_dir / "videos" / f"{vid}.json").write_text(
+        json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+
+
+def _embedding_row(db_path, vid):
+    con = schema.connect(db_path)
+    row = con.execute(
+        "SELECT embedding, embedding_model, embedding_dim FROM items WHERE id=?", (vid,)
+    ).fetchone()
+    con.close()
+    return row
+
+
+def test_sync_stores_embeddings_when_configured(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0, 0.0] for _ in texts])
+    sync(data, db)
+    row = _embedding_row(db, "v1")
+    assert row["embedding"] is not None
+    assert row["embedding_model"] == "fake-embed"
+    assert row["embedding_dim"] == 3
+    assert list(vector.unpack(row["embedding"])) == [1.0, 0.0, 0.0]
+
+
+def test_sync_skips_embeddings_when_not_configured(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    # embed_texts must never be called when unconfigured:
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: (_ for _ in ()).throw(AssertionError("called")))
+    sync(data, db)
+    assert _embedding_row(db, "v1")["embedding"] is None
+
+
+def test_sync_reembeds_on_model_change(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: "model-A")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0] for _ in texts])
+    sync(data, db)
+    assert _embedding_row(db, "v1")["embedding_model"] == "model-A"
+    # Same content, new model -> re-embed even though the content hash is unchanged.
+    calls = {"n": 0}
+    def _embed(texts):
+        calls["n"] += 1
+        return [[0.0, 1.0] for _ in texts]
+    monkeypatch.setattr(embed, "model_name", lambda: "model-B")
+    monkeypatch.setattr(embed, "embed_texts", _embed)
+    sync(data, db)
+    row = _embedding_row(db, "v1")
+    assert calls["n"] == 1
+    assert row["embedding_model"] == "model-B"
+    assert list(vector.unpack(row["embedding"])) == [0.0, 1.0]
+
+
+def test_sync_embedding_failure_leaves_row_without_crash(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: None)  # service down
+    summary = sync(data, db)          # must not raise
+    assert summary.added == 1
+    assert _embedding_row(db, "v1")["embedding"] is None

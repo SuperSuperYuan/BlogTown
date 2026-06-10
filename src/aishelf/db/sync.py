@@ -14,7 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from aishelf.contract.loader import load_items
-from aishelf.db import schema, tokenize
+from aishelf import embed
+from aishelf.db import schema, tokenize, vector
 from aishelf.db.config import default_db_path
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,12 @@ def _content_hash(item, note: str = "") -> str:
     return hashlib.sha1((blob + "\x00" + note).encode("utf-8")).hexdigest()
 
 
+def _embed_text(item, note: str) -> str:
+    """Text fed to the embedding model — author deliberately excluded so author
+    names don't pull unrelated same-author items closer in vector space."""
+    return " ".join([item.title, item.summary, " ".join(item.keywords), note]).strip()
+
+
 def _row(item, content_hash: str, synced_at: str) -> dict:
     d = item.model_dump(mode="json")
     return {
@@ -79,11 +86,16 @@ def sync(data_dir, db_path=None) -> SyncSummary:
         schema.init_db(con)
         summary = SyncSummary()
         existing = {
-            r["id"]: r["content_hash"]
-            for r in con.execute("SELECT id, content_hash FROM items")
+            r["id"]: (r["content_hash"], r["embedding_model"], r["has_emb"])
+            for r in con.execute(
+                "SELECT id, content_hash, embedding_model, "
+                "(embedding IS NOT NULL) AS has_emb FROM items"
+            )
         }
         synced_at = datetime.now(timezone.utc).isoformat()
         seen: set[str] = set()
+        embed_model = embed.model_name()  # None when unconfigured
+        to_embed: list[tuple] = []        # (item, note) needing (re)embedding
 
         placeholders = ", ".join(f":{c}" for c in _COLUMNS)
         updates = ", ".join(f"{c}=excluded.{c}" for c in _COLUMNS if c != "id")
@@ -96,27 +108,45 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             seen.add(it.id)
             note = _note_text(data_dir, it.id)
             h = _content_hash(it, note)
-            if existing.get(it.id) == h:
+            prev = existing.get(it.id)
+            needs_index = prev is None or prev[0] != h
+            needs_emb = bool(embed_model) and (
+                prev is None or needs_index or prev[1] != embed_model or not prev[2]
+            )
+            if not needs_index and not needs_emb:
                 summary.unchanged += 1
                 continue
-            con.execute(upsert_sql, _row(it, h, synced_at))
-            con.execute("DELETE FROM items_fts WHERE item_id = ?", (it.id,))
-            con.execute(
-                "INSERT INTO items_fts (item_id, title, summary, keywords, author, note) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    it.id,
-                    tokenize.bigrams(it.title),
-                    tokenize.bigrams(it.summary),
-                    tokenize.bigrams(" ".join(it.keywords)),
-                    tokenize.bigrams(it.author),
-                    tokenize.bigrams(note),
-                ),
-            )
-            if it.id in existing:
-                summary.updated += 1
-            else:
-                summary.added += 1
+            if needs_index:
+                con.execute(upsert_sql, _row(it, h, synced_at))
+                con.execute("DELETE FROM items_fts WHERE item_id = ?", (it.id,))
+                con.execute(
+                    "INSERT INTO items_fts (item_id, title, summary, keywords, author, note) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        it.id,
+                        tokenize.bigrams(it.title),
+                        tokenize.bigrams(it.summary),
+                        tokenize.bigrams(" ".join(it.keywords)),
+                        tokenize.bigrams(it.author),
+                        tokenize.bigrams(note),
+                    ),
+                )
+                if prev is not None:
+                    summary.updated += 1
+                else:
+                    summary.added += 1
+            if needs_emb:
+                to_embed.append((it, note))
+
+        if to_embed and embed_model:
+            vectors = embed.embed_texts([_embed_text(it, note) for it, note in to_embed])
+            if vectors:
+                for (it, _note), vec in zip(to_embed, vectors):
+                    con.execute(
+                        "UPDATE items SET embedding=?, embedding_model=?, embedding_dim=? "
+                        "WHERE id=?",
+                        (vector.pack(vec), embed_model, len(vec), it.id),
+                    )
 
         stale = [i for i in existing if i not in seen]
         for rid in stale:
