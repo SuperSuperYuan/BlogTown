@@ -162,6 +162,7 @@ main:has(.hermes) { max-width: none; padding: 10px 14px; }
 .jump-cards { margin: 6px 0 14px 52px; display: flex; flex-direction: column; gap: 6px; }
 .jump-label, .collect-text { font-size: 12px; color: #9aa5b1; }
 .jump-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+.jump-meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .collect-guide { margin: 6px 0 14px 52px; display: flex; align-items: center; gap: 10px; }
 .jump-btn, .collect-btn { font-size: 13px; color: #fff; background: #0a84ff; padding: 4px 10px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
 .jump-btn:hover, .collect-btn:hover { opacity: .9; }
