@@ -31,6 +31,12 @@ def client(monkeypatch, tmp_path):
     return TestClient(app)
 
 
+def _event_line(text, key):
+    """The single SSE `data:` line whose JSON payload contains the given key."""
+    marker = '"' + key + '"'
+    return next(l for l in text.splitlines() if l.startswith("data: ") and marker in l)
+
+
 def _chunk(content):
     return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=content))])
 
@@ -104,10 +110,10 @@ def test_ask_chat_video_navigation_emits_jump(client, monkeypatch):
     monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("ok")]))
     r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "打开 大语言模型 视频"}]})
     assert r.status_code == 200
-    assert '"jump"' in r.text
-    assert '"type": "video"' in r.text
-    assert "v1" in r.text
     assert '"collect"' not in r.text
+    jump = _event_line(r.text, "jump")
+    assert '"id": "v1"' in jump          # v1 is in the JUMP payload, not just sources
+    assert '"type": "video"' in jump
     assert r.text.index('"jump"') < r.text.index('"delta"')
 
 
@@ -119,9 +125,10 @@ def test_ask_chat_blog_navigation_emits_jump(client, tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("ok")]))
     r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "打开那篇 RAG 博客"}]})
     assert r.status_code == 200
-    assert '"jump"' in r.text
-    assert '"type": "blog"' in r.text
-    assert "b1" in r.text
+    jump = _event_line(r.text, "jump")
+    assert '"id": "b1"' in jump
+    assert '"type": "blog"' in jump
+    assert r.text.index('"jump"') < r.text.index('"delta"')
 
 
 def test_ask_chat_ordinary_question_no_jump_no_collect(client, monkeypatch):
@@ -152,3 +159,17 @@ def test_ask_chat_low_confidence_takes_precedence_over_jump(client, monkeypatch)
     assert r.status_code == 200
     assert '"collect"' in r.text
     assert '"jump"' not in r.text
+
+
+def test_ask_chat_nav_type_mismatch_emits_neither(client, tmp_path, monkeypatch):
+    # A relevant BLOG exists, but the user asks to open a VIDEO -> no video
+    # candidate to jump to, yet content is relevant -> not low confidence either.
+    _write(tmp_path, "blogs", "b1", "强化学习的视频教程入门")
+    from aishelf.db.sync import sync
+    sync(tmp_path, tmp_path / "atlas.db")
+    from aishelf.site import llm
+    monkeypatch.setattr(llm, "OpenAI", lambda **k: _FakeClient([_chunk("ok")]))
+    r = client.post("/ask/chat", json={"messages": [{"role": "user", "content": "打开强化学习视频"}]})
+    assert r.status_code == 200
+    assert '"jump"' not in r.text       # nav_types={video} but only a blog matched
+    assert '"collect"' not in r.text    # the blog IS relevant -> not low confidence
