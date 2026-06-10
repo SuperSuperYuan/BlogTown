@@ -1,7 +1,7 @@
 # Atlas — Architecture Summary
 
 **Status:** MVP + collection access control + scheduling + derived SQLite
-search DB + ask-your-library RAG chat (2026-06-09). 198 tests passing.
+search DB + ask-your-library RAG chat (2026-06-09). 223 tests passing.
 
 Atlas is a personal, local web app for collecting and browsing AI-domain content
 (interview/technical-talk **videos** and **blog/document** articles) from across
@@ -126,7 +126,7 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | `GET /videos/{id}`, `GET /blogs/{id}` | Detail (embed/cover, summary, keywords, **note editor**, **delete button**) |
 | `GET /authors/{key}` | An author's videos + blogs |
 | `GET /search?q=` | Cross-modality search page, grouped by type (reads files) |
-| `GET /api/search?q=&type=&page=` | Read-only JSON search over the derived DB (FTS5) — `{hits, page, ...}` |
+| `GET /api/search?q=&type=&page=` | Read-only JSON search over the derived DB (FTS5) — `{q, type, page, results}` |
 | `GET /ask` | Ask-your-library chat page (ungated; per-browser history). |
 | `POST /ask/chat` | SSE: `{sources}`, then optionally `{jump}` (open-intent jump-cards) or `{collect}` (empty→collect guide; takes precedence), then the streamed answer. **Ungated.** |
 | `GET /collect` | **Hermes** chat page + the 「定时采集」schedule section; `?q=` pre-fills the collection composer. |
@@ -206,7 +206,7 @@ otherwise `403`. Browsing, notes, and delete are not gated.
 pip install -e ".[dev]"
 python -m aishelf.site        # Atlas site + scheduler, default :8001 (AISHELF_DATA_DIR=data)
 python -m aishelf.db sync     # backfill/refresh the derived DB (--rebuild to recreate)
-pytest                        # 198 tests; network tests deselected by default
+pytest                        # 223 tests; network tests deselected by default
 ```
 
 Hermes must be running (default `http://127.0.0.1:8642/v1`) for collection to
