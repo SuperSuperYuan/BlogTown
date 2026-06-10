@@ -173,3 +173,13 @@ def test_ask_chat_nav_type_mismatch_emits_neither(client, tmp_path, monkeypatch)
     assert r.status_code == 200
     assert '"jump"' not in r.text       # nav_types={video} but only a blog matched
     assert '"collect"' not in r.text    # the blog IS relevant -> not low confidence
+
+
+def test_ask_page_has_jump_and_collect_handlers(client):
+    r = client.get("/ask")
+    assert r.status_code == 200
+    assert "renderJump" in r.text
+    assert "renderCollect" in r.text
+    assert "打开视频" in r.text
+    assert "打开文章" in r.text
+    assert "去 Hermes 采集" in r.text

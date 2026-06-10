@@ -95,6 +95,48 @@ function renderSources(afterEl, sources) {
   (afterEl.parentElement || afterEl).insertAdjacentElement("afterend", box);
 }
 
+// Render content jump-cards (videos/blogs) beneath the answer.
+function renderJump(afterEl, jump) {
+  if (!jump || !jump.length) return;
+  const box = document.createElement("div");
+  box.className = "jump-cards";
+  const label = document.createElement("div");
+  label.className = "jump-label";
+  label.textContent = "你想打开的内容";
+  box.appendChild(label);
+  jump.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = "jump-card";
+    const meta = document.createElement("span");
+    meta.className = "jump-meta";
+    meta.textContent = s.title + " — " + s.author + " · " + s.platform;
+    const a = document.createElement("a");
+    a.className = "jump-btn";
+    a.href = (s.type === "video" ? "/videos/" : "/blogs/") + encodeURIComponent(s.id);
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = s.type === "video" ? "打开视频" : "打开文章";
+    card.append(meta, a);
+    box.appendChild(card);
+  });
+  (afterEl.parentElement || afterEl).insertAdjacentElement("afterend", box);
+}
+
+// When the library has nothing relevant, guide the user to collect it.
+function renderCollect(afterEl, payload) {
+  const box = document.createElement("div");
+  box.className = "collect-guide";
+  const text = document.createElement("span");
+  text.className = "collect-text";
+  text.textContent = "本地内容库暂时没有相关内容，去 Hermes 采集？";
+  const a = document.createElement("a");
+  a.className = "collect-btn";
+  a.href = "/collect?q=" + encodeURIComponent((payload && payload.q) || "");
+  a.textContent = "去 Hermes 采集";
+  box.append(text, a);
+  (afterEl.parentElement || afterEl).insertAdjacentElement("afterend", box);
+}
+
 function updateExamples() {
   examples.style.display = messages.length ? "none" : "flex";
 }
@@ -157,6 +199,10 @@ async function send(text) {
       try { payload = JSON.parse(raw.slice(6)); } catch { continue; }
       if (payload.sources) {
         renderSources(assistantEl, payload.sources);
+      } else if (payload.jump) {
+        renderJump(assistantEl, payload.jump);
+      } else if (payload.collect) {
+        renderCollect(assistantEl, payload.collect);
       } else if (payload.delta) {
         if (!streaming) {
           streaming = true;
