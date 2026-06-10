@@ -10,13 +10,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from aishelf import embed
 from aishelf.db import search as db_search
-from aishelf.db import tokenize
+from aishelf.db import tokenize, vector
 from aishelf.site import notes
 
 DEFAULT_K = 6
 NAV_MAX = 5
 RELEVANCE_FLOOR = 0.15
+SIMILARITY_FLOOR = 0.30
+CANDIDATE_N = 20
 
 _CJK_NAV_VERBS = (
     "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看", "打开看",
@@ -57,24 +60,55 @@ def _note_for(item_id: str) -> str:
 
 
 def retrieve(db_path, question: str, *, k: int = DEFAULT_K) -> list[Source]:
-    """Top-k *relevant* FTS5 hits for the question, each enriched with its note.
+    """Top-k relevant sources for the question.
 
-    Uses OR-mode search so conversational questions (with stop-words like 什么/是)
-    still match relevant content via shared bigrams — but OR-mode also lets items
-    matching a single common bigram slip in, so the loosely-related tail is pruned
-    by relevant_sources() before returning. The pruned list grounds both the
-    Sources panel and the LLM prompt, and makes is_low_confidence consistent.
+    Hybrid when an embedding service is configured/reachable: vector recall over
+    the whole corpus (semantic / cross-lingual) unioned with FTS5 (exact-term
+    safety net), re-ranked by cosine and floored. Falls back to pure FTS5 + the
+    bigram-overlap floor when embeddings are unavailable — identical to before.
     """
+    qv = embed.embed_query(question)
+    if qv is None:
+        return _retrieve_fts_only(db_path, question, k)
+    return _retrieve_hybrid(db_path, question, qv, k)
+
+
+def _source_from_hit(h) -> Source:
+    return Source(
+        id=h.id, type=h.type, title=h.title, author=h.author,
+        platform=h.platform, summary=h.summary, keywords=h.keywords,
+        note=_note_for(h.id),
+    )
+
+
+def _sources_for_ids(db_path, ids: list[str]) -> list[Source]:
+    rows = db_search.get_by_ids(db_path, ids)
+    return [_source_from_hit(rows[i]) for i in ids if i in rows]
+
+
+def _retrieve_fts_only(db_path, question: str, k: int) -> list[Source]:
     hits = db_search.search(db_path, question, limit=k, mode="or")
-    sources = [
-        Source(
-            id=h.id, type=h.type, title=h.title, author=h.author,
-            platform=h.platform, summary=h.summary, keywords=h.keywords,
-            note=_note_for(h.id),
-        )
-        for h in hits
-    ]
+    sources = [_source_from_hit(h) for h in hits]
     return relevant_sources(question, sources)
+
+
+def _retrieve_hybrid(db_path, question: str, qv: list[float], k: int) -> list[Source]:
+    ids, matrix = vector.load_embeddings(db_path, len(qv))
+    ranked = vector.cosine_search(qv, ids, matrix, top_n=CANDIDATE_N)
+    fts_hits = db_search.search(db_path, question, limit=CANDIDATE_N, mode="or")
+
+    kept: list[str] = []
+    seen: set[str] = set()
+    for cid, score in ranked:                  # vector hits above the floor, cosine order
+        if score >= SIMILARITY_FLOOR and cid not in seen:
+            kept.append(cid)
+            seen.add(cid)
+    for h in fts_hits:                          # FTS exact hits append (bm25 order) — safety net
+        if h.id not in seen:
+            kept.append(h.id)
+            seen.add(h.id)
+    kept = kept[:k]
+    return _sources_for_ids(db_path, kept)
 
 
 def _question_bigrams(question: str) -> set[str]:

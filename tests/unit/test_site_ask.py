@@ -211,3 +211,67 @@ def test_is_low_confidence_borderline():
     assert ask.is_low_confidence("一二三四五六七八", [src]) is True
     # query "一二三四五六七" -> 6 bigrams; shares "一二" -> 1/6 ≈ 0.167 >= 0.15 -> False
     assert ask.is_low_confidence("一二三四五六七", [src]) is False
+
+
+from aishelf import embed as _embed
+from aishelf.db.sync import sync as _sync
+
+
+def _build_db(tmp_path, monkeypatch, items, embed_map):
+    """Write videos + a fake-embedded atlas.db. embed_map: text-substring -> vec."""
+    data = tmp_path / "data"
+    (data / "videos").mkdir(parents=True)
+    for it in items:
+        (data / "videos" / f"{it['id']}.json").write_text(
+            json.dumps(it, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(_embed, "model_name", lambda: "fake-embed")
+
+    def _texts(texts):
+        out = []
+        for t in texts:
+            vec = next((v for sub, v in embed_map.items() if sub in t), [0.0, 0.0, 1.0])
+            out.append(vec)
+        return out
+
+    monkeypatch.setattr(_embed, "embed_texts", _texts)
+    db = tmp_path / "atlas.db"
+    _sync(data, db)
+    return db
+
+
+def _vid(vid, title, summary):
+    return {"id": vid, "type": "video", "title": title, "author": "作者",
+            "platform": "youtube", "source_url": f"https://x/{vid}",
+            "published_at": "2024-01-01", "summary": summary, "keywords": [],
+            "collected_at": "2024-01-02T00:00:00", "thumbnail_url": "https://img/x.jpg"}
+
+
+def test_retrieve_hybrid_recalls_semantic_match(tmp_path, monkeypatch):
+    # FTS would not match an English title from a Chinese query, but the vector does.
+    db = _build_db(tmp_path, monkeypatch,
+                   [_vid("v1", "Scaling laws explained", "training compute"),
+                    _vid("v2", "园艺入门", "如何种花")],
+                   {"Scaling": [1.0, 0.0, 0.0], "园艺": [0.0, 1.0, 0.0]})
+    monkeypatch.setattr(ask.embed, "embed_query", lambda q: [1.0, 0.0, 0.0])
+    sources = ask.retrieve(db, "扩展定律", k=6)
+    assert [s.id for s in sources] == ["v1"]   # semantic hit; gardening pruned by floor
+
+
+def test_retrieve_hybrid_keeps_fts_safety_net(tmp_path, monkeypatch):
+    # v2 is a weak vector match (below floor) but an exact FTS hit -> kept.
+    db = _build_db(tmp_path, monkeypatch,
+                   [_vid("v1", "Scaling laws", "compute"),
+                    _vid("v2", "向量数据库实战", "讲解向量数据库")],
+                   {"Scaling": [1.0, 0.0, 0.0], "向量": [0.0, 0.0, 1.0]})
+    monkeypatch.setattr(ask.embed, "embed_query", lambda q: [1.0, 0.0, 0.0])
+    ids = [s.id for s in ask.retrieve(db, "向量数据库", k=6)]
+    assert "v2" in ids    # exact FTS hit survives despite low cosine
+
+
+def test_retrieve_falls_back_to_fts_when_embedding_unavailable(tmp_path, monkeypatch):
+    db = _build_db(tmp_path, monkeypatch,
+                   [_vid("v1", "向量数据库实战", "讲解向量数据库")],
+                   {"向量": [1.0, 0.0, 0.0]})
+    monkeypatch.setattr(ask.embed, "embed_query", lambda q: None)  # service down
+    sources = ask.retrieve(db, "向量数据库", k=6)
+    assert [s.id for s in sources] == ["v1"]  # pure-FTS path, today's behavior
