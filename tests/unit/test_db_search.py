@@ -1,7 +1,9 @@
 import json
 
+from aishelf.db import schema
 from aishelf.db.search import search
 from aishelf.db.sync import sync
+from aishelf.db import search as search_mod
 
 
 def _write(data_dir, sub, item_id, title, summary="摘要", keywords=None):
@@ -97,3 +99,37 @@ def test_search_or_mode_matches_where_and_does_not(tmp_path):
     # OR mode: succeeds because at least some bigrams overlap
     hits = search(db, query, mode="or")
     assert [h.id for h in hits] == ["b-rag"]
+
+
+# ---------------------------------------------------------------------------
+# get_by_ids
+# ---------------------------------------------------------------------------
+
+def _seed_direct(db_path):
+    con = schema.connect(db_path)
+    schema.init_db(con)
+    for rid in ("a", "b"):
+        con.execute(
+            "INSERT INTO items (id, type, title, author, platform, source_url, "
+            "published_at, collected_at, summary, keywords, content_hash, synced_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (rid, "video", f"标题{rid}", "作者", "youtube", "https://x/" + rid,
+             "2024-01-01", "2024-01-02", "摘要", "[]", "h", "2024-01-02"),
+        )
+    con.commit()
+    con.close()
+
+
+def test_get_by_ids_returns_mapping(tmp_path):
+    db = tmp_path / "atlas.db"
+    _seed_direct(db)
+    hits = search_mod.get_by_ids(db, ["b", "a", "missing"])
+    assert set(hits.keys()) == {"a", "b"}
+    assert hits["a"].title == "标题a"
+    assert hits["b"].type == "video"
+
+
+def test_get_by_ids_empty(tmp_path):
+    db = tmp_path / "atlas.db"
+    _seed_direct(db)
+    assert search_mod.get_by_ids(db, []) == {}

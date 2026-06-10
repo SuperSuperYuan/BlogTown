@@ -68,3 +68,19 @@ def search(db_path, q, *, type=None, limit: int = 20, offset: int = 0, mode: str
         return [_hit(r) for r in con.execute(sql, params).fetchall()]
     finally:
         con.close()
+
+
+def get_by_ids(db_path, ids: list[str]) -> "dict[str, SearchHit]":
+    """Hydrate items by id into a {id: SearchHit} map (missing ids omitted)."""
+    if not ids:
+        return {}
+    con = schema.connect(db_path)
+    try:
+        schema.init_db(con)
+        placeholders = ",".join("?" for _ in ids)
+        rows = con.execute(
+            f"SELECT * FROM items WHERE id IN ({placeholders})", list(ids)
+        ).fetchall()
+        return {r["id"]: _hit(r) for r in rows}
+    finally:
+        con.close()
