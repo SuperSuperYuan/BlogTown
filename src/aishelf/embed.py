@@ -15,6 +15,10 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+# Max inputs per /embeddings request. DashScope's OpenAI-compatible endpoint caps
+# this at 10; it's a safe conservative chunk size for other providers too.
+EMBED_BATCH_SIZE = 10
+
 
 def get_embed_settings() -> dict[str, str] | None:
     base = os.environ.get("ATLAS_EMBED_BASE_URL")
@@ -38,14 +42,23 @@ def get_client(settings: dict[str, str]) -> OpenAI:
 
 
 def embed_texts(texts: list[str]) -> list[list[float]] | None:
-    """Embeddings for a batch, or None if unconfigured / empty / on any error."""
+    """Embeddings for a batch, or None if unconfigured / empty / on any error.
+
+    Inputs are split into EMBED_BATCH_SIZE-sized requests (providers cap inputs
+    per call — DashScope at 10) and concatenated in order. Any sub-batch failure
+    degrades the whole call to None (all-or-nothing), so a partial batch is never
+    persisted as if complete."""
     s = get_embed_settings()
     if s is None or not texts:
         return None
     try:
         client = get_client(s)
-        resp = client.embeddings.create(model=s["model"], input=texts)
-        return [d.embedding for d in resp.data]
+        out: list[list[float]] = []
+        for i in range(0, len(texts), EMBED_BATCH_SIZE):
+            chunk = texts[i:i + EMBED_BATCH_SIZE]
+            resp = client.embeddings.create(model=s["model"], input=chunk)
+            out.extend(d.embedding for d in resp.data)
+        return out
     except Exception as exc:  # degrade to FTS5, never crash a read/sync
         logger.warning("embedding request failed: %s", exc)
         return None
