@@ -154,3 +154,16 @@ def test_collect_chat_triggers_db_sync(client, monkeypatch):
     assert r.status_code == 200
     assert "written" in r.text  # stream fully consumed
     assert done.wait(timeout=5)  # background sync ran after the stream
+
+
+def test_collect_page_prefills_q(client):
+    r = client.get("/collect", params={"q": "量子计算 视频"})
+    assert r.status_code == 200
+    assert "量子计算 视频" in r.text  # pre-filled into the composer textarea
+
+
+def test_collect_page_no_q_is_blank(client):
+    r = client.get("/collect")
+    assert r.status_code == 200
+    # composer renders with no prefilled text between the textarea tags
+    assert 'placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…"></textarea>' in r.text

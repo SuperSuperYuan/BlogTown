@@ -233,11 +233,15 @@ class _ChatRequest(BaseModel):
 
 
 @app.get("/collect", response_class=HTMLResponse)
-def collect_page(request: Request):
+def collect_page(request: Request, q: str = ""):
     return templates.TemplateResponse(
         request,
         "collect.html",
-        {"schedules": schedules.load_schedules(), "last_run": schedule_state.load_state(get_data_dir())},
+        {
+            "schedules": schedules.load_schedules(),
+            "last_run": schedule_state.load_state(get_data_dir()),
+            "prefill": q,
+        },
     )
 
 

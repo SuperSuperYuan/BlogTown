@@ -29,7 +29,7 @@
     </div>
 
     <form id="chatform" class="composer">
-      <textarea id="chatinput" rows="1" placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…"></textarea>
+      <textarea id="chatinput" rows="1" placeholder="输入采集需求，Enter 发送，Shift+Enter 换行…">{{ prefill | default('') }}</textarea>
       <button type="submit" id="chatsend" class="send" title="发送" aria-label="发送">➤</button>
     </form>
 
