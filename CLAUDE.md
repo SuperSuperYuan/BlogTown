@@ -40,22 +40,37 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/contract/` — `models.py` (`VideoItem`/`BlogItem` discriminated on
   `type`, `parse_item`), `loader.py` (`load_items` — validate + skip-bad + sort),
   `schema.py` (export to `docs/contract/content-item.schema.json`).
+- `aishelf/embed.py` (package root) — OpenAI-compatible embedding client
+  (`ATLAS_EMBED_*`): `is_configured`, `model_name`, `embed_texts`, `embed_query`.
+  No default; unset ⇒ every call returns `None` (silently disables semantic
+  retrieval). All errors are swallowed to `None` so reads never crash.
 - `aishelf/site/` — `app.py` (routes + scheduler lifespan), `views.py` (pure
   filter/search/paginate), `hermes.py` (Hermes connection + robust SSE
   `stream_chat`), `collect.py` (system-prompt builder + non-streaming
-  `run_once`), `ask.py` (RAG core for `/ask`: `retrieve`, `build_messages`,
-  `source_refs`, plus `nav_types`/`nav_candidates`/`nav_refs` for jump-cards and `is_low_confidence` for the empty→collect guide), `llm.py` (chat-model client, `ATLAS_CHAT_*`,
-  `stream_completion`), `notes.py` (per-item notes), `items.py` (`safe_id` +
-  `delete_item`), `allowlist.py` (collect passcode gate), `schedules.py`
-  (config load + pure `due_schedules`), `schedule_state.py` (last-run dates),
-  `scheduler.py` (background `run_due_now` loop), `templates/`, `static/`,
-  `__main__.py`.
+  `run_once`), `ask.py` (RAG core for `/ask`: `retrieve` — hybrid vector + FTS5
+  when `ATLAS_EMBED_*` is configured, pure FTS5 fallback otherwise; `build_messages`,
+  `source_refs`, plus `nav_types`/`nav_candidates`/`nav_refs` for jump-cards and
+  `is_low_confidence` for the empty→collect guide — fires when `retrieve` returns
+  nothing, since `retrieve` already owns the relevance gate), `llm.py` (chat-model
+  client, `ATLAS_CHAT_*`, `stream_completion`), `notes.py` (per-item notes),
+  `items.py` (`safe_id` + `delete_item`), `allowlist.py` (collect passcode gate),
+  `schedules.py` (config load + pure `due_schedules`), `schedule_state.py`
+  (last-run dates), `scheduler.py` (background `run_due_now` loop), `templates/`,
+  `static/`, `__main__.py`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
-  `connect`/`init_db`), `tokenize.py` (CJK bigram `bigrams`/`to_match_query`),
-  `sync.py` (idempotent `sync` — upsert + prune), `search.py` (`search` over
-  FTS5), `__main__.py` (CLI). The DB is a rebuildable view; files stay the
-  source of truth.
+  `connect`/`init_db`; the `items` table now includes `embedding BLOB`,
+  `embedding_model TEXT`, `embedding_dim INTEGER` — nullable, backfilled by
+  `sync --rebuild`), `tokenize.py` (CJK bigram `bigrams`/`to_match_query`),
+  `sync.py` (idempotent `sync` — upsert + prune; when `ATLAS_EMBED_*` is
+  configured, also computes and stores embeddings incrementally, re-embedding
+  new/changed items and any whose stored model differs from the current one;
+  embedding failure leaves rows intact without crashing), `vector.py`
+  (float32 BLOB `pack`/`unpack`, `load_embeddings`, and brute-force numpy
+  `cosine_search` — no vector index, exhaustive cosine over the corpus),
+  `search.py` (`search` over FTS5; `get_by_ids` hydrates items by id into a
+  `{id: SearchHit}` map), `__main__.py` (CLI). The DB is a rebuildable view;
+  files stay the source of truth.
 
 **Data & storage** (`data/`, gitignored):
 
@@ -78,7 +93,8 @@ triggers an off-thread re-sync so the updated note is searchable immediately.
 The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
 browse/search pages still read files. Initial deployment must run one
 `python -m aishelf.db sync --rebuild` to populate all columns including `note`
-(no startup/periodic sync by design).
+and (when `ATLAS_EMBED_*` is configured) to backfill embeddings for hybrid `/ask`
+retrieval (no startup/periodic sync by design).
 
 **Key conventions**
 
@@ -95,6 +111,12 @@ browse/search pages still read files. Initial deployment must run one
 - `AISHELF_DB_PATH` — derived SQLite DB file (default `<data_dir>/atlas.db`).
 - `ATLAS_CHAT_BASE_URL` / `ATLAS_CHAT_API_KEY` / `ATLAS_CHAT_MODEL` — the chat
   model that answers `/ask` questions (each defaults to the matching `HERMES_*`).
+- `ATLAS_EMBED_BASE_URL` / `ATLAS_EMBED_API_KEY` / `ATLAS_EMBED_MODEL` — a
+  self-hosted, OpenAI-compatible embedding service powering `/ask` semantic
+  retrieval. **No default** (the chat provider does not serve embeddings); unset
+  ⇒ semantic retrieval is silently disabled and `/ask` uses pure FTS5. After
+  configuring, run `python -m aishelf.db sync --rebuild` once to backfill
+  embeddings; changing the model re-embeds on the next sync.
 - `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` — site bind (default `127.0.0.1:8001`).
 - `HERMES_BASE_URL` / `HERMES_API_KEY` / `HERMES_MODEL` — Hermes connection
   (default `http://127.0.0.1:8642/v1`, model `hermes-agent`).

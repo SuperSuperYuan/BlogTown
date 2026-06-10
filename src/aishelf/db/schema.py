@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS items (
   embed_url         TEXT,
   cover_image_url   TEXT,
   site_name         TEXT,
+  embedding         BLOB,
+  embedding_model   TEXT,
+  embedding_dim     INTEGER,
   content_hash  TEXT NOT NULL,
   synced_at     TEXT NOT NULL
 );
