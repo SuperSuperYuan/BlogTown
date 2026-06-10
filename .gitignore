@@ -11,6 +11,7 @@ venv/
 config/authors.yaml
 config/collect_allowlist.txt
 config/schedules.yaml
+config/atlas-chat.env
 data/
 downloads/
 
