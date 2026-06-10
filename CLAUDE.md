@@ -43,7 +43,9 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/site/` — `app.py` (routes + scheduler lifespan), `views.py` (pure
   filter/search/paginate), `hermes.py` (Hermes connection + robust SSE
   `stream_chat`), `collect.py` (system-prompt builder + non-streaming
-  `run_once`), `notes.py` (per-item notes), `items.py` (`safe_id` +
+  `run_once`), `ask.py` (RAG core for `/ask`: `retrieve`, `build_messages`,
+  `source_refs`), `llm.py` (chat-model client, `ATLAS_CHAT_*`,
+  `stream_completion`), `notes.py` (per-item notes), `items.py` (`safe_id` +
   `delete_item`), `allowlist.py` (collect passcode gate), `schedules.py`
   (config load + pure `due_schedules`), `schedule_state.py` (last-run dates),
   `scheduler.py` (background `run_due_now` loop), `templates/`, `static/`,
@@ -67,13 +69,16 @@ Source layout uses a `src/` directory; package is `aishelf`.
 
 **Derived DB** (`aishelf.db`): a SQLite file (`<data_dir>/atlas.db`, gitignored)
 holding a structured mirror of the contract records plus a bigram FTS5 index for
-CJK full-text search. It is a **derived view** — files remain the source of
-truth and the DB is rebuildable at any time (`python -m aishelf.db sync`). It is
-synced after each collection (scheduled runs, and off-thread after manual chat
-collection). The read-only `GET /api/search?q=&type=&page=` endpoint queries it;
-existing browse/search pages still read files. Initial deployment must run one
-`python -m aishelf.db sync` to backfill existing records (no startup/periodic
-sync by design).
+CJK full-text search. The `items_fts` table also indexes per-item note text (the
+`note` column), so notes are searchable via `/api/search` and `/ask`. It is a
+**derived view** — files remain the source of truth and the DB is rebuildable at
+any time (`python -m aishelf.db sync`). It is synced after each collection
+(scheduled runs, and off-thread after manual chat collection); saving a note also
+triggers an off-thread re-sync so the updated note is searchable immediately.
+The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
+browse/search pages still read files. Initial deployment must run one
+`python -m aishelf.db sync --rebuild` to populate all columns including `note`
+(no startup/periodic sync by design).
 
 **Key conventions**
 
@@ -88,6 +93,8 @@ sync by design).
 
 - `AISHELF_DATA_DIR` — where content/notes live (default `data`).
 - `AISHELF_DB_PATH` — derived SQLite DB file (default `<data_dir>/atlas.db`).
+- `ATLAS_CHAT_BASE_URL` / `ATLAS_CHAT_API_KEY` / `ATLAS_CHAT_MODEL` — the chat
+  model that answers `/ask` questions (each defaults to the matching `HERMES_*`).
 - `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` — site bind (default `127.0.0.1:8001`).
 - `HERMES_BASE_URL` / `HERMES_API_KEY` / `HERMES_MODEL` — Hermes connection
   (default `http://127.0.0.1:8642/v1`, model `hermes-agent`).

@@ -1,7 +1,7 @@
 # Atlas — Architecture Summary
 
 **Status:** MVP + collection access control + scheduling + derived SQLite
-search DB (2026-06-09). 169 tests passing.
+search DB + ask-your-library RAG chat (2026-06-09). 198 tests passing.
 
 Atlas is a personal, local web app for collecting and browsing AI-domain content
 (interview/technical-talk **videos** and **blog/document** articles) from across
@@ -86,6 +86,8 @@ data/
 | `views.py` | Pure functions over `list[ContentItem]`: `videos`/`blogs` split, `search`, `by_keyword`, `by_author`/`author_key`, `paginate` (+ `Page`). No I/O — fully unit-tested. |
 | `hermes.py` | Hermes connection (`HERMES_BASE_URL`/`_API_KEY`/`_MODEL`) + `stream_chat` — robust SSE: skips empty/`None` chunks, turns any error into an SSE error event (never breaks the stream). API key is env-only (no committed default). |
 | `collect.py` | `build_collection_instructions(data_dir)` — the system prompt that tells Hermes the absolute data path, id/atomic-write rules, content rules, and embeds the JSON Schema. `run_once(prompt)` — a non-streaming collection call used by the scheduler. |
+| `ask.py` | RAG core for `/ask` (pure): `retrieve` (FTS5 hits + each item's note), `build_messages` (grounded system prompt: numbered sources, `[n]` citations, no-source guard), `source_refs`, `latest_user_question`. |
+| `llm.py` | Chat-model connection for answering (`ATLAS_CHAT_*`, defaulting to Hermes) + robust `stream_completion` (reuses `hermes.sse`). |
 | `allowlist.py` | Collect passcode gate: `load_tokens`/`is_allowed` over `config/collect_allowlist.txt` (one token per line, `#` comments). Read per request; **fail-closed** (missing/empty ⇒ nobody). |
 | `schedules.py` | `Schedule` model + `load_schedules`/`save_schedules` (atomic YAML at `config/schedules.yaml`) + `due_schedules(schedules, state, now)` — the pure "what should run now" function. |
 | `schedule_state.py` | `load_state`/`save_state` — atomic per-schedule last-run dates at `data/schedule_state.json` (so missed runs catch up across restarts). |
@@ -107,10 +109,10 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | File | Responsibility |
 |---|---|
 | `config.py` | `default_db_path(data_dir)` ← `AISHELF_DB_PATH` (default `<data_dir>/atlas.db`). |
-| `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author). |
-| `tokenize.py` | `bigrams`/`to_match_query` — CJK bigram tokenization so Chinese text is searchable without word segmentation. |
-| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file, prune rows whose file is gone. Pure-ish over the loader. |
-| `search.py` | `search(db_path, q, type, page)` — FTS5 query → structured hits (id/type/title/score), paginated. |
+| `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author/**note**). The `note` column lets `/ask` and `/api/search` reach into your own annotations. Existing deployments must run `python -m aishelf.db sync --rebuild` once to populate the new column. |
+| `tokenize.py` | `bigrams`/`to_match_query` (AND) + `to_match_query_or` (OR) — CJK bigram tokenization so Chinese text is searchable without word segmentation. |
+| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file (incl. its note text), prune rows whose file is gone. Pure-ish over the loader. |
+| `search.py` | `search(db_path, q, *, type=None, limit, offset, mode="and")` — FTS5 query → structured hits, paginated; `mode="or"` is the lenient retrieval path used by `/ask`. |
 | `__main__.py` | `python -m aishelf.db sync [--rebuild]` (backfill / drop+recreate). |
 
 ---
@@ -125,6 +127,8 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | `GET /authors/{key}` | An author's videos + blogs |
 | `GET /search?q=` | Cross-modality search page, grouped by type (reads files) |
 | `GET /api/search?q=&type=&page=` | Read-only JSON search over the derived DB (FTS5) — `{hits, page, ...}` |
+| `GET /ask` | Ask-your-library chat page (ungated; per-browser history). |
+| `POST /ask/chat` | SSE: retrieve over `atlas.db` (summaries + notes), stream a grounded answer, plus a `{sources}` event for the linked Sources panel. **Ungated.** |
 | `GET /collect` | **Hermes** chat page + the 「定时采集」schedule section (list + form) |
 | `POST /collect/chat` | SSE proxy: prepends the collection instruction, streams Hermes. **Gated** by the collect passcode (`X-Collect-Token`) |
 | `POST /schedules` | Create/edit (upsert by name) a schedule. **Gated** (400 bad name/time/empty prompt) |
@@ -160,6 +164,12 @@ otherwise `403`. Browsing, notes, and delete are not gated.
   no file scan. The DB is kept current by syncing after collection: scheduled
   runs sync inline, manual chat collection syncs off-thread once the stream ends.
   The page-rendered `/search` still reads files; `/api/search` is the DB path.
+- **Ask:** `POST /ask/chat` retrieves the top-K items for the latest question
+  (FTS5 over summaries + notes, OR-mode bigram matching so natural-language
+  questions match), builds a grounded prompt (numbered sources, citation +
+  no-hallucination rules), streams the answer from the `ATLAS_CHAT_*` model, and
+  emits a `{sources}` event the page renders as links. Saving a note re-syncs the
+  index so notes are searchable.
 - **Note:** detail page prefills the saved note; saving POSTs to `/notes/{id}` →
   atomic write under `data/notes/`. Independent of the content record.
 - **Delete:** confirm → `POST /delete/{id}` → `items.delete_item` unlinks the
@@ -196,7 +206,7 @@ otherwise `403`. Browsing, notes, and delete are not gated.
 pip install -e ".[dev]"
 python -m aishelf.site        # Atlas site + scheduler, default :8001 (AISHELF_DATA_DIR=data)
 python -m aishelf.db sync     # backfill/refresh the derived DB (--rebuild to recreate)
-pytest                        # 169 tests; network tests deselected by default
+pytest                        # 198 tests; network tests deselected by default
 ```
 
 Hermes must be running (default `http://127.0.0.1:8642/v1`) for collection to

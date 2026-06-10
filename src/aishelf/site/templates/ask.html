@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}问答 · Atlas{% endblock %}
+{% block content %}
+<div class="hermes">
+  <div class="hermes-main">
+  <section class="card hermes-intro">
+    <header class="hermes-head">
+      <div class="hermes-avatar">A</div>
+      <div class="hermes-head-text">
+        <h1>问答</h1>
+        <p class="lead">基于你收藏的视频 / 博客摘要与你的笔记来回答问题，并给出可点击的来源。</p>
+      </div>
+    </header>
+  </section>
+
+  <section class="card chat-card">
+    <div id="log" class="chatlog"></div>
+
+    <div id="examples" class="examples">
+      <span class="examples-label">试试：</span>
+      <button type="button" class="chip">我收藏的内容里关于 RAG 有哪些观点？</button>
+      <button type="button" class="chip">总结一下我看过的 agent 相关视频</button>
+    </div>
+
+    <form id="chatform" class="composer">
+      <textarea id="chatinput" rows="1" placeholder="问关于你内容库的问题，Enter 发送，Shift+Enter 换行…"></textarea>
+      <button type="submit" id="chatsend" class="send" title="发送" aria-label="发送">➤</button>
+    </form>
+
+    <div class="actionbar">
+      <button id="chatclear" type="button" class="ghost">清除对话</button>
+      <span class="spacer"></span>
+      <a class="textlink" href="/videos">查看视频</a>
+      <a class="textlink" href="/blogs">查看博客</a>
+    </div>
+  </section>
+  </div>
+</div>
+<script>
+const STORAGE_KEY = "aishelf_ask_history";
+const log = document.getElementById("log");
+const form = document.getElementById("chatform");
+const input = document.getElementById("chatinput");
+const sendBtn = document.getElementById("chatsend");
+const clearBtn = document.getElementById("chatclear");
+const examples = document.getElementById("examples");
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveHistory() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+}
+const messages = loadHistory();
+
+function bubble(cls, text) {
+  const row = document.createElement("div");
+  row.className = "msg " + cls;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = cls === "user" ? "我" : "A";
+  const body = document.createElement("div");
+  body.className = "bubble " + cls;
+  body.textContent = text;
+  row.append(avatar, body);
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+  return body;
+}
+
+function showTyping(el) {
+  el.classList.add("typing");
+  el.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+}
+
+// Render a "来源" panel of links beneath the answer bubble.
+function renderSources(afterEl, sources) {
+  if (!sources || !sources.length) return;
+  const box = document.createElement("div");
+  box.className = "sources";
+  const label = document.createElement("div");
+  label.className = "sources-label";
+  label.textContent = "来源";
+  box.appendChild(label);
+  sources.forEach((s, i) => {
+    const a = document.createElement("a");
+    a.className = "source-link";
+    a.href = (s.type === "video" ? "/videos/" : "/blogs/") + encodeURIComponent(s.id);
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = "[" + (i + 1) + "] " + s.title + " — " + s.author;
+    box.appendChild(a);
+  });
+  (afterEl.parentElement || afterEl).insertAdjacentElement("afterend", box);
+}
+
+function updateExamples() {
+  examples.style.display = messages.length ? "none" : "flex";
+}
+
+function autosize() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 200) + "px";
+}
+input.addEventListener("input", autosize);
+
+for (const m of messages) {
+  bubble(m.role === "user" ? "user" : "assistant", m.content);
+}
+updateExamples();
+
+async function send(text) {
+  messages.push({ role: "user", content: text });
+  saveHistory();
+  updateExamples();
+  bubble("user", text);
+  const assistantEl = bubble("assistant", "");
+  showTyping(assistantEl);
+  let acc = "";
+  let streaming = false;
+
+  function fail(msg) {
+    assistantEl.classList.remove("typing", "streaming");
+    assistantEl.classList.add("error");
+    assistantEl.textContent = msg;
+  }
+
+  let resp;
+  try {
+    resp = await fetch("/ask/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    });
+  } catch (e) {
+    fail("⚠️ 请求失败：" + e);
+    return;
+  }
+  if (!resp.ok || !resp.body) {
+    fail("⚠️ 请求失败：HTTP " + resp.status);
+    return;
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const raw = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      if (!raw.startsWith("data: ")) continue;
+      let payload;
+      try { payload = JSON.parse(raw.slice(6)); } catch { continue; }
+      if (payload.sources) {
+        renderSources(assistantEl, payload.sources);
+      } else if (payload.delta) {
+        if (!streaming) {
+          streaming = true;
+          assistantEl.classList.remove("typing");
+          assistantEl.classList.add("streaming");
+        }
+        acc += payload.delta;
+        assistantEl.textContent = acc;
+        log.scrollTop = log.scrollHeight;
+      } else if (payload.error) {
+        fail("⚠️ " + payload.error);
+      } else if (payload.done) {
+        assistantEl.classList.remove("typing", "streaming");
+        messages.push({ role: "assistant", content: acc });
+        saveHistory();
+      }
+    }
+  }
+  assistantEl.classList.remove("typing", "streaming");
+}
+
+function submitCurrent() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  autosize();
+  sendBtn.disabled = true;
+  send(text).finally(() => { sendBtn.disabled = false; input.focus(); });
+}
+
+form.addEventListener("submit", (e) => { e.preventDefault(); submitCurrent(); });
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitCurrent(); }
+});
+for (const chip of examples.querySelectorAll(".chip")) {
+  chip.addEventListener("click", () => { input.value = chip.textContent; autosize(); input.focus(); });
+}
+clearBtn.addEventListener("click", () => {
+  messages.length = 0;
+  localStorage.removeItem(STORAGE_KEY);
+  log.innerHTML = "";
+  updateExamples();
+});
+</script>
+{% endblock %}

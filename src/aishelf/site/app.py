@@ -23,9 +23,11 @@ from aishelf.db import sync as db_sync
 from aishelf.db.config import default_db_path
 from aishelf.site import (
     allowlist,
+    ask,
     collect,
     hermes,
     items,
+    llm,
     notes,
     schedule_state,
     scheduler,
@@ -107,6 +109,16 @@ app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 
 def _items():
     return load_items(get_data_dir())
+
+
+def _sync_db_async(data_dir) -> None:
+    """Refresh the derived DB off the request thread (it's a recoverable view)."""
+    def _bg():
+        try:
+            db_sync.sync(data_dir, default_db_path(data_dir))
+        except Exception as exc:  # derived DB; never surface to the caller
+            logger.warning("background DB sync failed: %s", exc)
+    threading.Thread(target=_bg, name="aishelf-db-sync", daemon=True).start()
 
 
 @app.exception_handler(404)
@@ -244,16 +256,34 @@ def collect_chat(req: _ChatRequest, x_collect_token: str | None = Header(default
         try:
             yield from stream
         finally:
-            # Hermes wrote files during the turn; refresh the derived DB off-thread
-            # so it never blocks or breaks the SSE response.
-            def _bg():
-                try:
-                    db_sync.sync(data_dir, default_db_path(data_dir))
-                except Exception as exc:  # derived DB; recoverable
-                    logger.warning("DB sync after chat collection failed: %s", exc)
-            threading.Thread(target=_bg, name="aishelf-chat-sync", daemon=True).start()
+            # Hermes wrote files during the turn; refresh the derived DB.
+            _sync_db_async(data_dir)
 
     return StreamingResponse(_with_sync(), media_type="text/event-stream")
+
+
+@app.get("/ask", response_class=HTMLResponse)
+def ask_page(request: Request):
+    return templates.TemplateResponse(request, "ask.html", {})
+
+
+@app.post("/ask/chat")
+def ask_chat(req: _ChatRequest):
+    # Ungated: answering is cheap relative to collection and is core "reading" use.
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="messages 不能为空")
+    data_dir = get_data_dir()
+    messages = [m.model_dump() for m in req.messages]
+    question = ask.latest_user_question(messages)
+    sources = ask.retrieve(default_db_path(data_dir), question)
+    payload = ask.build_messages(messages, sources)
+
+    def _gen():
+        # Emit the sources first so the client can render the panel immediately.
+        yield hermes.sse({"sources": ask.source_refs(sources)})
+        yield from llm.stream_completion(payload)
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 class _ScheduleRequest(BaseModel):
@@ -330,6 +360,8 @@ def save_note_route(item_id: str, req: _NoteRequest):
         updated_at = notes.save_note(item_id, req.text)
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid note id")
+    # The note text feeds search; refresh the derived index off-thread.
+    _sync_db_async(get_data_dir())
     return {"ok": True, "updated_at": updated_at}
 
 

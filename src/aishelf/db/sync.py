@@ -11,6 +11,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 from aishelf.contract.loader import load_items
 from aishelf.db import schema, tokenize
@@ -35,9 +36,20 @@ _COLUMNS = (
 )
 
 
-def _content_hash(item) -> str:
+def _note_text(data_dir, item_id: str) -> str:
+    """The user's note for an item, or '' if none/unreadable. Read by data_dir
+    (not the env) so sync stays self-contained on its argument."""
+    path = Path(data_dir) / "notes" / f"{item_id}.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return ""
+    return data.get("text", "") if isinstance(data, dict) else ""
+
+
+def _content_hash(item, note: str = "") -> str:
     blob = json.dumps(item.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
-    return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+    return hashlib.sha1((blob + "\x00" + note).encode("utf-8")).hexdigest()
 
 
 def _row(item, content_hash: str, synced_at: str) -> dict:
@@ -82,21 +94,23 @@ def sync(data_dir, db_path=None) -> SyncSummary:
 
         for it in items:
             seen.add(it.id)
-            h = _content_hash(it)
+            note = _note_text(data_dir, it.id)
+            h = _content_hash(it, note)
             if existing.get(it.id) == h:
                 summary.unchanged += 1
                 continue
             con.execute(upsert_sql, _row(it, h, synced_at))
             con.execute("DELETE FROM items_fts WHERE item_id = ?", (it.id,))
             con.execute(
-                "INSERT INTO items_fts (item_id, title, summary, keywords, author) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO items_fts (item_id, title, summary, keywords, author, note) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     it.id,
                     tokenize.bigrams(it.title),
                     tokenize.bigrams(it.summary),
                     tokenize.bigrams(" ".join(it.keywords)),
                     tokenize.bigrams(it.author),
+                    tokenize.bigrams(note),
                 ),
             )
             if it.id in existing:

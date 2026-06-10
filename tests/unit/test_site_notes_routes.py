@@ -56,3 +56,16 @@ def test_saving_note_leaves_content_record_untouched(client):
     assert r.status_code == 200
     assert record.read_bytes() == before  # Hermes-owned record unchanged
     assert (Path(data) / "notes" / "youtube-aaa.json").exists()
+
+
+def test_saving_note_triggers_db_sync(client, monkeypatch):
+    import threading
+
+    from aishelf.db import sync as db_sync
+
+    done = threading.Event()
+    monkeypatch.setattr(db_sync, "sync", lambda data_dir, db_path: done.set())
+
+    r = client.post("/notes/youtube-aaa", json={"text": "让笔记进入搜索索引"})
+    assert r.status_code == 200
+    assert done.wait(timeout=5)  # background sync ran after the note was saved

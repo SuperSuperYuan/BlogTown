@@ -1,4 +1,4 @@
-from aishelf.db.tokenize import bigrams, to_match_query
+from aishelf.db.tokenize import bigrams, to_match_query, to_match_query_or
 
 
 def test_bigrams_cjk_multichar():
@@ -37,3 +37,38 @@ def test_to_match_query_multichar_is_anded():
 def test_to_match_query_empty_when_no_tokens():
     assert to_match_query("   ") == ""
     assert to_match_query("！") == ""
+
+
+# --- to_match_query_or ---
+
+def test_to_match_query_or_multichar_is_ored():
+    result = to_match_query_or("大模型")
+    assert result == '"大模" OR "模型"'
+    assert " OR " in result
+    assert " AND " not in result
+
+
+def test_to_match_query_or_bigrams_are_quoted():
+    result = to_match_query_or("检索增强")
+    # each bigram should be wrapped in double quotes
+    for bigram in ["检索", "索增", "增强"]:
+        assert f'"{bigram}"' in result
+    assert " OR " in result
+    assert " AND " not in result
+
+
+def test_to_match_query_or_two_char_cjk():
+    # a two-char CJK string produces exactly one bigram — no OR needed but still quoted
+    result = to_match_query_or("检索")
+    assert result == '"检索"'
+
+
+def test_to_match_query_or_empty_when_no_tokens():
+    assert to_match_query_or("") == ""
+    assert to_match_query_or("   ") == ""
+    assert to_match_query_or("！！") == ""
+
+
+def test_to_match_query_or_ascii_consistent_with_and():
+    # for a single ASCII term both modes produce the same quoted token
+    assert to_match_query_or("rag") == to_match_query("rag")
