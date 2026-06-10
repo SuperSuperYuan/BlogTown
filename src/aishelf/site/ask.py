@@ -13,6 +13,14 @@ from aishelf.db import search as db_search
 from aishelf.site import notes
 
 DEFAULT_K = 6
+NAV_MAX = 5
+
+_NAV_VERBS = (
+    "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看",
+    "打开看", "open", "play", "watch", "go to",
+)
+_VIDEO_CUES = ("视频", "video")
+_BLOG_CUES = ("博客", "文章", "帖子", "blog", "article", "post")
 
 
 @dataclass
@@ -66,6 +74,40 @@ def source_refs(sources: list[Source]) -> list[dict]:
     return [
         {"id": s.id, "type": s.type, "title": s.title, "author": s.author}
         for s in sources
+    ]
+
+
+def nav_types(question: str) -> set[str]:
+    """The {video, blog} subset the user explicitly asks to open/view.
+
+    A modality is included iff (any nav verb) AND (that modality's cue) appears.
+    Empty set means no navigation intent. ASCII matching is case-insensitive;
+    CJK is unaffected by lower().
+    """
+    q = (question or "").lower()
+    if not any(v in q for v in _NAV_VERBS):
+        return set()
+    types: set[str] = set()
+    if any(c in q for c in _VIDEO_CUES):
+        types.add("video")
+    if any(c in q for c in _BLOG_CUES):
+        types.add("blog")
+    return types
+
+
+def nav_candidates(sources: list[Source], types: set[str]) -> list[Source]:
+    """Sources whose type is requested, in retrieval order, capped at NAV_MAX."""
+    if not types:
+        return []
+    return [s for s in sources if s.type in types][:NAV_MAX]
+
+
+def nav_refs(candidates: list[Source]) -> list[dict]:
+    """Card payload for the client (links + label decided client-side by type)."""
+    return [
+        {"id": s.id, "type": s.type, "title": s.title, "author": s.author,
+         "platform": s.platform}
+        for s in candidates
     ]
 
 

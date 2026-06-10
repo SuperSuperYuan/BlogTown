@@ -52,6 +52,53 @@ def test_source_refs_shape():
     ]
 
 
+def _blog_src(i):
+    return Source(id=f"b{i}", type="blog", title=f"博文{i}", author="作者乙",
+                  platform="blog", summary=f"摘要{i}", keywords=["k"], note="")
+
+
+def test_nav_types_video_intent():
+    assert ask.nav_types("我要查看 Karpathy 的视频") == {"video"}
+    assert ask.nav_types("播放这个视频") == {"video"}
+    assert ask.nav_types("go to that video") == {"video"}
+
+
+def test_nav_types_blog_intent():
+    assert ask.nav_types("打开那篇 RAG 博客") == {"blog"}
+    assert ask.nav_types("我要看这篇文章") == {"blog"}
+    assert ask.nav_types("open that article") == {"blog"}
+
+
+def test_nav_types_both():
+    assert ask.nav_types("打开关于 agent 的视频和文章") == {"video", "blog"}
+
+
+def test_nav_types_none_without_nav_verb():
+    assert ask.nav_types("RAG 是什么") == set()
+    assert ask.nav_types("总结一下 agent 相关视频") == set()
+    assert ask.nav_types("这个视频讲了什么") == set()  # cue but no nav verb
+
+
+def test_nav_candidates_filters_by_type_and_caps():
+    sources = [_src(1), _blog_src(1), _src(2), _blog_src(2)]
+    vids = ask.nav_candidates(sources, {"video"})
+    assert [s.id for s in vids] == ["v1", "v2"]
+    both = ask.nav_candidates(sources, {"video", "blog"})
+    assert [s.id for s in both] == ["v1", "b1", "v2", "b2"]  # retrieval order preserved
+    assert ask.nav_candidates(sources, set()) == []
+
+
+def test_nav_candidates_caps_at_nav_max():
+    many = [_src(i) for i in range(ask.NAV_MAX + 3)]
+    assert len(ask.nav_candidates(many, {"video"})) == ask.NAV_MAX
+
+
+def test_nav_refs_shape():
+    assert ask.nav_refs([_src(1)]) == [
+        {"id": "v1", "type": "video", "title": "标题1", "author": "作者甲", "platform": "youtube"},
+    ]
+
+
 def test_retrieve_finds_note_only_match(tmp_path, monkeypatch):
     # an item whose summary lacks the term, but whose note contains it
     data = tmp_path / "data"
