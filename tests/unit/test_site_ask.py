@@ -79,6 +79,26 @@ def test_nav_types_none_without_nav_verb():
     assert ask.nav_types("这个视频讲了什么") == set()  # cue but no nav verb
 
 
+def test_nav_types_none_without_modality_cue():
+    # nav verb present but NO modality cue -> empty set (both sides of the AND)
+    assert ask.nav_types("watch it") == set()
+    assert ask.nav_types("打开看看") == set()
+    assert ask.nav_types("open this") == set()
+
+
+def test_nav_types_ascii_verb_word_boundary():
+    # "play" must not match inside "display"/"replay"/"gameplay"
+    assert ask.nav_types("display the video") == set()
+    assert ask.nav_types("replay analysis of the article") == set()
+    # a real ASCII nav verb with a cue still works
+    assert ask.nav_types("play that video") == {"video"}
+
+
+def test_nav_types_cjk_verb_surrounded_by_chinese():
+    # CJK verb must still match when surrounded by other Chinese (no \b around CJK)
+    assert ask.nav_types("请打开那个视频") == {"video"}
+
+
 def test_nav_candidates_filters_by_type_and_caps():
     sources = [_src(1), _blog_src(1), _src(2), _blog_src(2)]
     vids = ask.nav_candidates(sources, {"video"})

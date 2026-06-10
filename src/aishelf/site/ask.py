@@ -7,6 +7,7 @@ that forbids answering outside the provided sources. No LLM or HTTP here.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from aishelf.db import search as db_search
@@ -15,10 +16,11 @@ from aishelf.site import notes
 DEFAULT_K = 6
 NAV_MAX = 5
 
-_NAV_VERBS = (
-    "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看",
-    "打开看", "open", "play", "watch", "go to",
+_CJK_NAV_VERBS = (
+    "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看", "打开看",
 )
+# ASCII verbs need word boundaries so "play" doesn't match inside "display"/"replay".
+_ASCII_NAV_RE = re.compile(r"\b(?:open|play|watch|go to)\b")
 _VIDEO_CUES = ("视频", "video")
 _BLOG_CUES = ("博客", "文章", "帖子", "blog", "article", "post")
 
@@ -85,7 +87,7 @@ def nav_types(question: str) -> set[str]:
     CJK is unaffected by lower().
     """
     q = (question or "").lower()
-    if not any(v in q for v in _NAV_VERBS):
+    if not (any(v in q for v in _CJK_NAV_VERBS) or _ASCII_NAV_RE.search(q)):
         return set()
     types: set[str] = set()
     if any(c in q for c in _VIDEO_CUES):
