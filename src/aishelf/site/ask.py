@@ -11,10 +11,12 @@ import re
 from dataclasses import dataclass
 
 from aishelf.db import search as db_search
+from aishelf.db import tokenize
 from aishelf.site import notes
 
 DEFAULT_K = 6
 NAV_MAX = 5
+RELEVANCE_FLOOR = 0.15
 
 _CJK_NAV_VERBS = (
     "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看", "打开看",
@@ -111,6 +113,23 @@ def nav_refs(candidates: list[Source]) -> list[dict]:
          "platform": s.platform}
         for s in candidates
     ]
+
+
+def is_low_confidence(question: str, sources: list[Source]) -> bool:
+    """True when the library has nothing relevant: no sources, or the top source
+    shares fewer than RELEVANCE_FLOOR of the question's bigrams. Pure heuristic —
+    empty retrieval is the primary signal, overlap is a conservative secondary
+    catch for loose OR-mode matches."""
+    if not sources:
+        return True
+    q_bigrams = set(tokenize.bigrams(question).split())
+    if not q_bigrams:
+        return True
+    top = sources[0]
+    text = " ".join([top.title, top.summary, " ".join(top.keywords), top.author, top.note])
+    s_bigrams = set(tokenize.bigrams(text).split())
+    overlap = len(q_bigrams & s_bigrams) / len(q_bigrams)
+    return overlap < RELEVANCE_FLOOR
 
 
 _RULES = (

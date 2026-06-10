@@ -139,3 +139,25 @@ def test_retrieve_finds_note_only_match(tmp_path, monkeypatch):
     sources = ask.retrieve(db, "向量", k=5)
     assert [s.id for s in sources] == ["v1"]
     assert sources[0].note == "讲到了向量数据库"   # note loaded fresh into the source
+
+
+def test_is_low_confidence_empty_sources():
+    assert ask.is_low_confidence("任意问题", []) is True
+
+
+def test_is_low_confidence_no_overlap():
+    src = Source(id="v1", type="video", title="大语言模型与检索增强", author="作者甲",
+                 platform="youtube", summary="一段摘要", keywords=[], note="")
+    assert ask.is_low_confidence("量子计算最新进展", [src]) is True
+
+
+def test_is_low_confidence_strong_overlap():
+    src = Source(id="v1", type="video", title="大语言模型与检索增强", author="作者甲",
+                 platform="youtube", summary="一段摘要", keywords=[], note="")
+    assert ask.is_low_confidence("大语言模型", [src]) is False
+
+
+def test_is_low_confidence_empty_question():
+    src = Source(id="v1", type="video", title="标题", author="作者甲",
+                 platform="youtube", summary="摘要", keywords=[], note="")
+    assert ask.is_low_confidence("", [src]) is True  # no query tokens -> low confidence
