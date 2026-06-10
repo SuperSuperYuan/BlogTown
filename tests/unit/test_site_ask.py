@@ -161,3 +161,12 @@ def test_is_low_confidence_empty_question():
     src = Source(id="v1", type="video", title="标题", author="作者甲",
                  platform="youtube", summary="摘要", keywords=[], note="")
     assert ask.is_low_confidence("", [src]) is True  # no query tokens -> low confidence
+
+
+def test_is_low_confidence_borderline():
+    # query "一二三四五六七八" -> 7 bigrams; source shares only "一二" -> 1/7 ≈ 0.143 < 0.15 -> True
+    src = Source(id="v1", type="video", title="一二 nothing else", author="x",
+                 platform="y", summary="", keywords=[], note="")
+    assert ask.is_low_confidence("一二三四五六七八", [src]) is True
+    # query "一二三四五六七" -> 6 bigrams; shares "一二" -> 1/6 ≈ 0.167 >= 0.15 -> False
+    assert ask.is_low_confidence("一二三四五六七", [src]) is False
