@@ -1,7 +1,8 @@
 # Atlas — Architecture Summary
 
 **Status:** MVP + collection access control + scheduling + derived SQLite
-search DB + ask-your-library RAG chat (2026-06-09). 223 tests passing.
+search DB + ask-your-library RAG chat + hybrid FTS5/semantic retrieval
+(2026-06-10). 246 tests passing.
 
 Atlas is a personal, local web app for collecting and browsing AI-domain content
 (interview/technical-talk **videos** and **blog/document** articles) from across
@@ -86,8 +87,9 @@ data/
 | `views.py` | Pure functions over `list[ContentItem]`: `videos`/`blogs` split, `search`, `by_keyword`, `by_author`/`author_key`, `paginate` (+ `Page`). No I/O — fully unit-tested. |
 | `hermes.py` | Hermes connection (`HERMES_BASE_URL`/`_API_KEY`/`_MODEL`) + `stream_chat` — robust SSE: skips empty/`None` chunks, turns any error into an SSE error event (never breaks the stream). API key is env-only (no committed default). |
 | `collect.py` | `build_collection_instructions(data_dir)` — the system prompt that tells Hermes the absolute data path, id/atomic-write rules, content rules, and embeds the JSON Schema. `run_once(prompt)` — a non-streaming collection call used by the scheduler. |
-| `ask.py` | RAG core for `/ask` (pure): `retrieve` (FTS5 hits + each item's note), `build_messages` (grounded system prompt: numbered sources, `[n]` citations, no-source guard), `source_refs`, `latest_user_question`. Also `nav_types`/`nav_candidates`/`nav_refs` (content jump-cards on explicit open/view intent) and `is_low_confidence` (empty/low-overlap → collect guide). |
+| `ask.py` | RAG core for `/ask` (pure): `retrieve` — hybrid vector cosine + FTS5 when `ATLAS_EMBED_*` is configured (vector recall unioned with bigram-floored FTS5 safety net, cosine-reranked above a similarity floor), pure FTS5 fallback otherwise; `build_messages` (grounded system prompt: numbered sources, `[n]` citations, no-source guard), `source_refs`, `latest_user_question`. Also `nav_types`/`nav_candidates`/`nav_refs` (content jump-cards on explicit open/view intent) and `is_low_confidence` (empty retrieval → collect guide; `retrieve` already owns the relevance gate, so the guide fires exactly when retrieval returned nothing). |
 | `llm.py` | Chat-model connection for answering (`ATLAS_CHAT_*`, defaulting to Hermes) + robust `stream_completion` (reuses `hermes.sse`). |
+| _(package root)_ `embed.py` | OpenAI-compatible embedding client (`ATLAS_EMBED_*`): `is_configured`, `model_name`, `embed_texts`, `embed_query`. **No default** (the chat/Hermes provider does not serve embeddings); unset ⇒ every call returns `None`, silently disabling semantic retrieval. All errors are swallowed to `None` so reads never crash. |
 | `allowlist.py` | Collect passcode gate: `load_tokens`/`is_allowed` over `config/collect_allowlist.txt` (one token per line, `#` comments). Read per request; **fail-closed** (missing/empty ⇒ nobody). |
 | `schedules.py` | `Schedule` model + `load_schedules`/`save_schedules` (atomic YAML at `config/schedules.yaml`) + `due_schedules(schedules, state, now)` — the pure "what should run now" function. |
 | `schedule_state.py` | `load_state`/`save_state` — atomic per-schedule last-run dates at `data/schedule_state.json` (so missed runs catch up across restarts). |
@@ -109,10 +111,11 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | File | Responsibility |
 |---|---|
 | `config.py` | `default_db_path(data_dir)` ← `AISHELF_DB_PATH` (default `<data_dir>/atlas.db`). |
-| `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author/**note**). The `note` column lets `/ask` and `/api/search` reach into your own annotations. Existing deployments must run `python -m aishelf.db sync --rebuild` once to populate the new column. |
+| `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author/**note**). The `note` column lets `/ask` and `/api/search` reach into your own annotations. Three nullable columns added for semantic retrieval: `embedding BLOB`, `embedding_model TEXT`, `embedding_dim INTEGER`. Existing deployments must run `python -m aishelf.db sync --rebuild` once to populate all new columns. |
 | `tokenize.py` | `bigrams`/`to_match_query` (AND) + `to_match_query_or` (OR) — CJK bigram tokenization so Chinese text is searchable without word segmentation. |
-| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file (incl. its note text), prune rows whose file is gone. Pure-ish over the loader. |
-| `search.py` | `search(db_path, q, *, type=None, limit, offset, mode="and")` — FTS5 query → structured hits, paginated; `mode="or"` is the lenient retrieval path used by `/ask`. |
+| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file (incl. its note text), prune rows whose file is gone. When `ATLAS_EMBED_*` is configured, also computes and stores embeddings incrementally (re-embeds new/changed items and any whose stored model name differs from the current one). Embedded text is `title + summary + keywords + note` — author is deliberately excluded. Embedding failure leaves rows intact without crashing; unconfigured ⇒ identical to before. |
+| `vector.py` | Float32 BLOB `pack`/`unpack`, `load_embeddings(db_path, dim)` (returns ids + an (N, dim) numpy matrix, filtered to rows whose stored dim matches the query dim), and brute-force `cosine_search`. No vector index — exhaustive cosine is sub-100 ms at personal-library scale. |
+| `search.py` | `search(db_path, q, *, type=None, limit, offset, mode="and")` — FTS5 query → structured hits, paginated; `mode="or"` is the lenient retrieval path used by `/ask`. `get_by_ids(db_path, ids)` hydrates a list of ids into a `{id: SearchHit}` map (used by the hybrid retrieval path). |
 | `__main__.py` | `python -m aishelf.db sync [--rebuild]` (backfill / drop+recreate). |
 
 ---
@@ -164,12 +167,22 @@ otherwise `403`. Browsing, notes, and delete are not gated.
   no file scan. The DB is kept current by syncing after collection: scheduled
   runs sync inline, manual chat collection syncs off-thread once the stream ends.
   The page-rendered `/search` still reads files; `/api/search` is the DB path.
-- **Ask:** `POST /ask/chat` retrieves the top-K items for the latest question
-  (FTS5 over summaries + notes, OR-mode bigram matching so natural-language
-  questions match), builds a grounded prompt (numbered sources, citation +
-  no-hallucination rules), streams the answer from the `ATLAS_CHAT_*` model, and
-  emits a `{sources}` event the page renders as links. Saving a note re-syncs the
-  index so notes are searchable. When the turn reads as an explicit open/view request the answer also carries `{jump}` cards to detail pages; when nothing relevant is found it carries a `{collect}` guide to `/collect?q=<question>` (low-confidence is checked first and suppresses jump-cards).
+- **Ask:** `POST /ask/chat` retrieves the top-K items for the latest question,
+  builds a grounded prompt (numbered sources, citation + no-hallucination rules),
+  streams the answer from the `ATLAS_CHAT_*` model, and emits a `{sources}` event
+  the page renders as links. Saving a note re-syncs the index so notes are
+  searchable. **Retrieval is hybrid when `ATLAS_EMBED_*` is configured**: the
+  question is embedded once; vector cosine recall over the whole corpus
+  (semantic, cross-lingual) is unioned with bigram-floored FTS5 OR-mode hits as
+  an exact-term safety net; vector hits are kept above a cosine similarity floor
+  (0.30), FTS safety-net hits pass the same bigram-overlap floor as the FTS-only
+  path; the union is capped at k. When embeddings are unavailable (unconfigured,
+  service down, or corpus not yet embedded), retrieval falls back to the prior
+  pure FTS5 + bigram-overlap floor path — behavior identical to before. When the
+  turn reads as an explicit open/view request the answer also carries `{jump}`
+  cards to detail pages; when retrieval returns nothing (the relevance gate is
+  inside `retrieve()`) it carries a `{collect}` guide to `/collect?q=<question>`
+  (low-confidence check precedes jump-cards and suppresses them).
 - **Note:** detail page prefills the saved note; saving POSTs to `/notes/{id}` →
   atomic write under `data/notes/`. Independent of the content record.
 - **Delete:** confirm → `POST /delete/{id}` → `items.delete_item` unlinks the
@@ -197,8 +210,9 @@ otherwise `403`. Browsing, notes, and delete are not gated.
   files — `collect_allowlist.txt` (passcodes), `schedules.yaml` (timers),
   `authors.yaml` (legacy). The `*.example` variants are the documentation.
 - **Tech stack:** Python 3.11+, FastAPI, Jinja2, uvicorn, pydantic v2, PyYAML,
-  `openai` SDK (Hermes is OpenAI-compatible), SQLite + FTS5 (stdlib `sqlite3`,
-  no extra dep). Deps in `pyproject.toml`.
+  `openai` SDK (Hermes + embedding service are OpenAI-compatible), SQLite + FTS5
+  (stdlib `sqlite3`, no extra dep), `numpy` (brute-force cosine for hybrid
+  retrieval). Deps in `pyproject.toml`.
 
 ### Running
 
@@ -206,7 +220,7 @@ otherwise `403`. Browsing, notes, and delete are not gated.
 pip install -e ".[dev]"
 python -m aishelf.site        # Atlas site + scheduler, default :8001 (AISHELF_DATA_DIR=data)
 python -m aishelf.db sync     # backfill/refresh the derived DB (--rebuild to recreate)
-pytest                        # 223 tests; network tests deselected by default
+pytest                        # 246 tests; network tests deselected by default
 ```
 
 Hermes must be running (default `http://127.0.0.1:8642/v1`) for collection to
@@ -214,7 +228,9 @@ work; everything else works against whatever is already in `data/`. To collect,
 add a passcode to `config/collect_allowlist.txt` and enter it on the page. On a
 fresh deploy, run `python -m aishelf.db sync` once to backfill `/api/search`.
 Extra env: `AISHELF_COLLECT_ALLOWLIST`, `AISHELF_SCHEDULES`,
-`AISHELF_SCHEDULER_ENABLED` (launcher sets it; empty to disable), `AISHELF_DB_PATH`.
+`AISHELF_SCHEDULER_ENABLED` (launcher sets it; empty to disable), `AISHELF_DB_PATH`,
+`ATLAS_EMBED_BASE_URL`/`_API_KEY`/`_MODEL` (optional; enables hybrid `/ask` retrieval —
+run `python -m aishelf.db sync --rebuild` once after setting to backfill embeddings).
 
 ### Testing
 
@@ -270,4 +286,5 @@ Each piece has its own spec → plan in `docs/superpowers/`:
 | Scheduled collection | 2026-06-05 |
 | Schedules UI (in `/collect`) | 2026-06-05 |
 | Derived SQLite DB + FTS5 search | 2026-06-08 |
+| Hybrid retrieval (FTS5 + embeddings) | 2026-06-10 |
 | (superseded) Hermes WebUI, M1 scraper | 2026-06-02, 2026-05-28 |
