@@ -19,7 +19,7 @@ DEFAULT_K = 6
 NAV_MAX = 5
 RELEVANCE_FLOOR = 0.15
 SIMILARITY_FLOOR = 0.30
-CANDIDATE_N = 20
+CANDIDATE_N = 20  # over-fetch from each arm (vector + FTS) so the union has enough after dedup
 
 _CJK_NAV_VERBS = (
     "打开", "播放", "跳转", "前往", "带我去", "查看", "我要看", "我想看", "想看", "打开看",
@@ -103,10 +103,13 @@ def _retrieve_hybrid(db_path, question: str, qv: list[float], k: int) -> list[So
         if score >= SIMILARITY_FLOOR and cid not in seen:
             kept.append(cid)
             seen.add(cid)
-    for h in fts_hits:                          # FTS exact hits append (bm25 order) — safety net
-        if h.id not in seen:
-            kept.append(h.id)
-            seen.add(h.id)
+    # FTS exact-term safety net — but still bigram-floored (same gate as the
+    # FTS-only path) so OR-mode single-bigram noise doesn't leak into hybrid.
+    fts_safety = relevant_sources(question, [_source_from_hit(h) for h in fts_hits])
+    for s in fts_safety:
+        if s.id not in seen:
+            kept.append(s.id)
+            seen.add(s.id)
     kept = kept[:k]
     return _sources_for_ids(db_path, kept)
 
@@ -180,16 +183,16 @@ def nav_refs(candidates: list[Source]) -> list[dict]:
 
 
 def is_low_confidence(question: str, sources: list[Source]) -> bool:
-    """True when the library has nothing relevant: no sources, or the top source
-    shares fewer than RELEVANCE_FLOOR of the question's bigrams. Pure heuristic —
-    empty retrieval is the primary signal, overlap is a conservative secondary
-    catch for loose OR-mode matches."""
-    if not sources:
-        return True
-    q_bigrams = _question_bigrams(question)
-    if not q_bigrams:
-        return True
-    return _overlap(q_bigrams, sources[0]) < RELEVANCE_FLOOR
+    """True when retrieval found nothing relevant.
+
+    retrieve() already applies the relevance gate (cosine floor on the vector
+    path, bigram-overlap floor via relevant_sources on the FTS path), so any
+    returned source is relevant by construction — including cross-lingual
+    semantic matches that share no bigrams with the question. The confidence
+    signal is therefore simply whether retrieval returned anything. `question`
+    is retained for call-site stability and possible future heuristics.
+    """
+    return not sources
 
 
 _RULES = (

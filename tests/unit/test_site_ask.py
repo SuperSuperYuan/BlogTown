@@ -1,5 +1,7 @@
 import json
 
+from aishelf import embed as _embed
+from aishelf.db.sync import sync as _sync
 from aishelf.site import ask
 from aishelf.site.ask import Source
 
@@ -182,39 +184,16 @@ def test_retrieve_prunes_irrelevant_tail(tmp_path, monkeypatch):
     assert [s.id for s in sources] == ["v1"]
 
 
-def test_is_low_confidence_empty_sources():
+def test_is_low_confidence_true_when_no_sources():
     assert ask.is_low_confidence("任意问题", []) is True
 
 
-def test_is_low_confidence_no_overlap():
-    src = Source(id="v1", type="video", title="大语言模型与检索增强", author="作者甲",
-                 platform="youtube", summary="一段摘要", keywords=[], note="")
-    assert ask.is_low_confidence("量子计算最新进展", [src]) is True
-
-
-def test_is_low_confidence_strong_overlap():
-    src = Source(id="v1", type="video", title="大语言模型与检索增强", author="作者甲",
-                 platform="youtube", summary="一段摘要", keywords=[], note="")
-    assert ask.is_low_confidence("大语言模型", [src]) is False
-
-
-def test_is_low_confidence_empty_question():
-    src = Source(id="v1", type="video", title="标题", author="作者甲",
-                 platform="youtube", summary="摘要", keywords=[], note="")
-    assert ask.is_low_confidence("", [src]) is True  # no query tokens -> low confidence
-
-
-def test_is_low_confidence_borderline():
-    # query "一二三四五六七八" -> 7 bigrams; source shares only "一二" -> 1/7 ≈ 0.143 < 0.15 -> True
-    src = Source(id="v1", type="video", title="一二 nothing else", author="x",
-                 platform="y", summary="", keywords=[], note="")
-    assert ask.is_low_confidence("一二三四五六七八", [src]) is True
-    # query "一二三四五六七" -> 6 bigrams; shares "一二" -> 1/6 ≈ 0.167 >= 0.15 -> False
-    assert ask.is_low_confidence("一二三四五六七", [src]) is False
-
-
-from aishelf import embed as _embed
-from aishelf.db.sync import sync as _sync
+def test_is_low_confidence_false_when_sources_present():
+    # retrieve() already filtered to relevant sources, so any present source
+    # means confident — even a cross-lingual hit with zero bigram overlap.
+    src = Source(id="v1", type="video", title="Scaling laws explained", author="作者",
+                 platform="youtube", summary="training compute", keywords=[], note="")
+    assert ask.is_low_confidence("扩展定律", [src]) is False
 
 
 def _build_db(tmp_path, monkeypatch, items, embed_map):
@@ -275,3 +254,32 @@ def test_retrieve_falls_back_to_fts_when_embedding_unavailable(tmp_path, monkeyp
     monkeypatch.setattr(ask.embed, "embed_query", lambda q: None)  # service down
     sources = ask.retrieve(db, "向量数据库", k=6)
     assert [s.id for s in sources] == ["v1"]  # pure-FTS path, today's behavior
+
+
+def test_retrieve_hybrid_prunes_noise_fts_safety_net(tmp_path, monkeypatch):
+    # v2 is a vector miss AND only a single-common-bigram FTS match ("数据") for a
+    # long query -> must be pruned, not kept by the safety net.
+    db = _build_db(tmp_path, monkeypatch,
+                   [_vid("v1", "向量数据库实战", "讲解向量数据库"),
+                    _vid("v2", "数据隐私与合规", "讲解数据隐私")],
+                   {"向量": [1.0, 0.0, 0.0], "隐私": [0.0, 1.0, 0.0]})
+    monkeypatch.setattr(ask.embed, "embed_query", lambda q: [1.0, 0.0, 0.0])
+    ids = [s.id for s in ask.retrieve(db, "向量数据库的工程实践经验", k=6)]
+    assert ids == ["v1"]  # v2's single-bigram FTS match pruned by the floor
+
+
+def test_retrieve_hybrid_with_unembedded_corpus_returns_fts_hits(tmp_path, monkeypatch):
+    # Embedding service reachable now, but the corpus was synced WITHOUT embeddings
+    # (e.g. day one before `sync --rebuild`). load_embeddings is empty -> fall
+    # through to FTS hits (still bigram-floored).
+    data = tmp_path / "data"
+    (data / "videos").mkdir(parents=True)
+    (data / "videos" / "v1.json").write_text(
+        json.dumps(_vid("v1", "向量数据库实战", "讲解向量数据库"), ensure_ascii=False),
+        encoding="utf-8")
+    from aishelf.db.sync import sync as _sync2
+    db = tmp_path / "atlas.db"
+    _sync2(data, db)  # ATLAS_EMBED_* unset in tests -> no embeddings stored
+    monkeypatch.setattr(ask.embed, "embed_query", lambda q: [1.0, 0.0, 0.0])
+    ids = [s.id for s in ask.retrieve(db, "向量数据库", k=6)]
+    assert ids == ["v1"]
