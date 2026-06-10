@@ -57,13 +57,16 @@ def _note_for(item_id: str) -> str:
 
 
 def retrieve(db_path, question: str, *, k: int = DEFAULT_K) -> list[Source]:
-    """Top-k FTS5 hits for the question, each enriched with its user note.
+    """Top-k *relevant* FTS5 hits for the question, each enriched with its note.
 
     Uses OR-mode search so conversational questions (with stop-words like 什么/是)
-    still match relevant content via shared bigrams.
+    still match relevant content via shared bigrams — but OR-mode also lets items
+    matching a single common bigram slip in, so the loosely-related tail is pruned
+    by relevant_sources() before returning. The pruned list grounds both the
+    Sources panel and the LLM prompt, and makes is_low_confidence consistent.
     """
     hits = db_search.search(db_path, question, limit=k, mode="or")
-    return [
+    sources = [
         Source(
             id=h.id, type=h.type, title=h.title, author=h.author,
             platform=h.platform, summary=h.summary, keywords=h.keywords,
@@ -71,6 +74,33 @@ def retrieve(db_path, question: str, *, k: int = DEFAULT_K) -> list[Source]:
         )
         for h in hits
     ]
+    return relevant_sources(question, sources)
+
+
+def _question_bigrams(question: str) -> set[str]:
+    return set(tokenize.bigrams(question).split())
+
+
+def _source_text(s: Source) -> str:
+    return " ".join([s.title, s.summary, " ".join(s.keywords), s.author, s.note])
+
+
+def _overlap(q_bigrams: set[str], s: Source) -> float:
+    """Fraction of the question's bigrams that appear in the source's text.
+    Assumes q_bigrams is non-empty (callers guard the empty-question case)."""
+    s_bigrams = set(tokenize.bigrams(_source_text(s)).split())
+    return len(q_bigrams & s_bigrams) / len(q_bigrams)
+
+
+def relevant_sources(question: str, sources: list[Source]) -> list[Source]:
+    """Keep only sources sharing at least RELEVANCE_FLOOR of the question's
+    bigrams, preserving retrieval order. Prunes the loosely-related tail that
+    OR-mode retrieval lets through (items matching a single common bigram). An
+    empty question has no bigrams, so nothing is considered relevant."""
+    q_bigrams = _question_bigrams(question)
+    if not q_bigrams:
+        return []
+    return [s for s in sources if _overlap(q_bigrams, s) >= RELEVANCE_FLOOR]
 
 
 def source_refs(sources: list[Source]) -> list[dict]:
@@ -122,14 +152,10 @@ def is_low_confidence(question: str, sources: list[Source]) -> bool:
     catch for loose OR-mode matches."""
     if not sources:
         return True
-    q_bigrams = set(tokenize.bigrams(question).split())
+    q_bigrams = _question_bigrams(question)
     if not q_bigrams:
         return True
-    top = sources[0]
-    text = " ".join([top.title, top.summary, " ".join(top.keywords), top.author, top.note])
-    s_bigrams = set(tokenize.bigrams(text).split())
-    overlap = len(q_bigrams & s_bigrams) / len(q_bigrams)
-    return overlap < RELEVANCE_FLOOR
+    return _overlap(q_bigrams, sources[0]) < RELEVANCE_FLOOR
 
 
 _RULES = (

@@ -141,6 +141,47 @@ def test_retrieve_finds_note_only_match(tmp_path, monkeypatch):
     assert sources[0].note == "讲到了向量数据库"   # note loaded fresh into the source
 
 
+def test_relevant_sources_drops_unrelated():
+    related = Source(id="v1", type="video", title="大语言模型与检索增强", author="作者甲",
+                     platform="youtube", summary="讲解大语言模型", keywords=[], note="")
+    unrelated = Source(id="v2", type="video", title="园艺与种花入门", author="作者乙",
+                       platform="youtube", summary="如何养花", keywords=[], note="")
+    kept = ask.relevant_sources("大语言模型", [related, unrelated])
+    assert [s.id for s in kept] == ["v1"]
+
+
+def test_relevant_sources_empty_question_keeps_nothing():
+    src = Source(id="v1", type="video", title="标题", author="x", platform="y",
+                 summary="摘要", keywords=[], note="")
+    assert ask.relevant_sources("", [src]) == []
+
+
+def test_retrieve_prunes_irrelevant_tail(tmp_path, monkeypatch):
+    # Two items share the common bigram "数据" but only one is about the question.
+    data = tmp_path / "data"
+    (data / "videos").mkdir(parents=True)
+    recs = [
+        {"id": "v1", "type": "video", "title": "向量数据库实战", "author": "甲",
+         "platform": "youtube", "source_url": "https://x/v1", "published_at": "2024-01-01",
+         "summary": "讲解向量数据库", "keywords": [], "collected_at": "2024-01-02T00:00:00",
+         "thumbnail_url": "https://img/x.jpg"},
+        {"id": "v2", "type": "video", "title": "数据隐私与合规", "author": "乙",
+         "platform": "youtube", "source_url": "https://x/v2", "published_at": "2024-01-01",
+         "summary": "讲解数据隐私", "keywords": [], "collected_at": "2024-01-02T00:00:00",
+         "thumbnail_url": "https://img/y.jpg"},
+    ]
+    for r in recs:
+        (data / "videos" / f"{r['id']}.json").write_text(
+            json.dumps(r, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(data))
+    from aishelf.db.sync import sync
+    db = tmp_path / "atlas.db"
+    sync(data, db)
+    # 11 bigrams; v2 shares only "数据" (1/11 ≈ 0.09 < 0.15) so its tail match is pruned.
+    sources = ask.retrieve(db, "向量数据库的工程实践经验", k=5)
+    assert [s.id for s in sources] == ["v1"]
+
+
 def test_is_low_confidence_empty_sources():
     assert ask.is_low_confidence("任意问题", []) is True
 
