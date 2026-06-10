@@ -54,7 +54,7 @@ time and recomputed on `sync --rebuild`.
 | Module | Responsibility |
 |---|---|
 | **`aishelf/embed.py`** (new, package root) | Embedding client. OpenAI-compatible, reads `ATLAS_EMBED_BASE_URL/_API_KEY/_MODEL`. API: `embed_texts(texts) -> list[list[float]] \| None`, `embed_query(text) -> list[float] \| None`, `is_configured() -> bool`, `model_name() -> str \| None`. Returns `None` (never raises to caller) when unconfigured or on any client/HTTP error, so callers degrade. Placed at the package root because both `db` and `site` use it (avoids a `db → site` reverse dependency). Reuses the `openai` SDK, mirroring `llm.py` / `hermes.py`; mocked in tests the same way. |
-| **`aishelf/db/vector.py`** (new) | Pure vector math over stored embeddings. `pack(vec) -> bytes` / `unpack(blob, dim) -> list[float]` (stdlib `array('f')`). `load_embeddings(db_path, *, type=None) -> tuple[list[str], np.ndarray]` (ids + matrix of rows that have an embedding). `cosine_search(query_vec, ids, matrix, *, top_n) -> list[tuple[str, float]]` (cosine similarity, descending). No I/O beyond the read; deterministic and unit-testable. |
+| **`aishelf/db/vector.py`** (new) | Pure vector math over stored embeddings. `pack(vec) -> bytes` / `unpack(blob) -> np.ndarray` (float32; dim implicit in the buffer length). `load_embeddings(db_path, dim, *, type=None) -> tuple[list[str], np.ndarray]` (ids + matrix of rows that have an embedding **of that dim** — the dim filter excludes stale vectors from a previous model so a query never compares mismatched dimensions). `cosine_search(query_vec, ids, matrix, *, top_n) -> list[tuple[str, float]]` (cosine similarity, descending). No I/O beyond the read; deterministic and unit-testable. |
 | `aishelf/db/schema.py` | `items` table gains three nullable columns: `embedding BLOB`, `embedding_model TEXT`, `embedding_dim INTEGER`. Reflected in `init_db`. Existing deployments run `python -m aishelf.db sync --rebuild` once to add them (same procedure used when the `note` column was added). |
 | `aishelf/db/sync.py` | When `embed.is_configured()`, after the row's text is assembled, recompute its embedding iff it is **missing**, the **stored model differs** from the configured model, or the **embedded text changed**. Persist `embedding`, `embedding_model`, `embedding_dim`. When not configured, or when `embed_texts` returns `None`, skip embeddings (log once) — FTS5 sync proceeds unchanged. The embedded text is `title + summary + keywords + note` — **author is deliberately excluded** so author names don't pull "same author, unrelated topic" items closer in vector space. (This differs from the degraded-path bigram scorer `_overlap`, which still includes author; that stays as-is.) |
 | `aishelf/site/ask.py` | `retrieve()` becomes hybrid (below). The pure helpers (`relevant_sources`, `_overlap`, `is_low_confidence`) are unchanged and remain the degraded-path scorer. |
@@ -69,7 +69,7 @@ final `k = DEFAULT_K` (≈6).
 2. **If `qv is None`** (unconfigured / service down): fall back to the **current**
    path — OR-mode FTS5 → `relevant_sources(question, sources)`. Behavior identical
    to today. Stop.
-3. **Vector recall:** `vector.load_embeddings(db_path)` + `cosine_search(qv, …,
+3. **Vector recall:** `vector.load_embeddings(db_path, len(qv))` + `cosine_search(qv, …,
    top_n=CANDIDATE_N)` over the **whole corpus** (not just FTS5 hits — this is what
    surfaces items FTS5 missed).
 4. **FTS5 recall:** existing OR-mode `db_search.search(..., mode="or",
