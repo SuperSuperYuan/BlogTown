@@ -44,7 +44,7 @@ Source layout uses a `src/` directory; package is `aishelf`.
   filter/search/paginate), `hermes.py` (Hermes connection + robust SSE
   `stream_chat`), `collect.py` (system-prompt builder + non-streaming
   `run_once`), `ask.py` (RAG core for `/ask`: `retrieve`, `build_messages`,
-  `source_refs`), `llm.py` (chat-model client, `ATLAS_CHAT_*`,
+  `source_refs`, plus `nav_types`/`nav_candidates`/`nav_refs` for jump-cards and `is_low_confidence` for the empty→collect guide), `llm.py` (chat-model client, `ATLAS_CHAT_*`,
   `stream_completion`), `notes.py` (per-item notes), `items.py` (`safe_id` +
   `delete_item`), `allowlist.py` (collect passcode gate), `schedules.py`
   (config load + pure `due_schedules`), `schedule_state.py` (last-run dates),

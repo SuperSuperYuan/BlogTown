@@ -148,6 +148,12 @@ Because the search index now also covers your notes, an existing deployment must
 run `python -m aishelf.db sync --rebuild` once after upgrading so the new note
 column is populated.
 
+The answer surfaces two next-action affordances when relevant: if you explicitly
+ask to open a video or blog (e.g. "打开那个 RAG 视频"), matching items appear as
+**jump-cards** linking to their detail pages; if the library has nothing relevant
+to your question, a **「去 Hermes 采集」** guide links to `/collect` with your
+question pre-filled (`/collect?q=...`) so you can collect it in one step.
+
 ## Export the contract schema
 
 Hermes is instructed with the JSON Schema for content records. Regenerate it
