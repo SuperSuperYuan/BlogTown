@@ -47,3 +47,59 @@ def neighbors(vec, ids: list[str], matrix: np.ndarray, *, floor: float = GRAPH_S
 def _canon(a: str, b: str) -> tuple[str, str]:
     """Canonical undirected key: (min, max) by string order."""
     return (a, b) if a < b else (b, a)
+
+
+def _load_groups(con) -> dict[int, tuple[list[str], np.ndarray]]:
+    """All stored embeddings grouped by dimension: {dim: (ids, matrix)}.
+
+    Grouping by dim keeps a stale, different-dimension vector (after a model
+    change, before a re-sync) from ever being compared against the current one.
+    """
+    rows = con.execute(
+        "SELECT id, embedding, embedding_dim FROM items WHERE embedding IS NOT NULL"
+    ).fetchall()
+    by_dim: dict[int, list[tuple[str, bytes]]] = {}
+    for r in rows:
+        by_dim.setdefault(r["embedding_dim"], []).append((r["id"], r["embedding"]))
+    groups: dict[int, tuple[list[str], np.ndarray]] = {}
+    for dim, items in by_dim.items():
+        ids = [i for i, _ in items]
+        mat = np.stack([vector.unpack(b) for _, b in items])
+        groups[dim] = (ids, mat)
+    return groups
+
+
+def delete_edges_for(con, item_ids) -> None:
+    """Drop every edge incident to any of the given ids."""
+    for cid in item_ids:
+        con.execute("DELETE FROM edges WHERE src = ? OR dst = ?", (cid, cid))
+
+
+def recompute_edges_for(con, item_ids, *, floor: float = GRAPH_SIM_FLOOR) -> None:
+    """Recompute edges for the given (re)embedded items.
+
+    Deletes each id's incident edges, then re-adds its >= floor neighbors (within
+    the same embedding dimension). Symmetric + order-independent: an edge a-b is
+    present whenever either endpoint's recompute adds it.
+    """
+    item_ids = list(item_ids)
+    if not item_ids:
+        return
+    delete_edges_for(con, item_ids)
+    groups = _load_groups(con)
+    pos: dict[str, tuple[int, int]] = {}
+    for dim, (ids, _mat) in groups.items():
+        for i, sid in enumerate(ids):
+            pos[sid] = (dim, i)
+    for cid in item_ids:
+        loc = pos.get(cid)
+        if loc is None:               # item has no embedding -> no edges
+            continue
+        dim, i = loc
+        ids, mat = groups[dim]
+        for oid, sim in neighbors(mat[i], ids, mat, floor=floor, exclude=cid):
+            src, dst = _canon(cid, oid)
+            con.execute(
+                "INSERT OR REPLACE INTO edges (src, dst, weight) VALUES (?, ?, ?)",
+                (src, dst, sim),
+            )

@@ -29,3 +29,51 @@ def test_neighbors_empty():
 def test_canon_orders_pair():
     assert graph._canon("b", "a") == ("a", "b")
     assert graph._canon("a", "b") == ("a", "b")
+
+
+def _seed_item(con, rid, typ, vec):
+    con.execute(
+        "INSERT INTO items (id, type, title, author, platform, source_url, "
+        "published_at, collected_at, summary, keywords, embedding, embedding_model, "
+        "embedding_dim, content_hash, synced_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (rid, typ, f"标题{rid}", "作者", "p", f"https://x/{rid}", "2024-01-01",
+         "2024-01-02", "s", "[]", graph.vector.pack(vec), "m", len(vec), "h", "2024-01-02"),
+    )
+
+
+def _edge_set(con):
+    return {(r["src"], r["dst"]) for r in con.execute("SELECT src, dst FROM edges")}
+
+
+def test_recompute_edges_for_new_item(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    _seed_item(con, "b", "blog", [0.97, 0.24])   # close to a
+    _seed_item(con, "c", "video", [0.0, 1.0])    # far from a
+    graph.recompute_edges_for(con, ["a", "b", "c"], floor=0.5)
+    assert _edge_set(con) == {("a", "b")}        # only a-b clears the floor, stored canonically
+    con.close()
+
+
+def test_recompute_is_incremental_and_symmetric(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    graph.recompute_edges_for(con, ["a"], floor=0.5)      # no neighbors yet
+    assert _edge_set(con) == set()
+    _seed_item(con, "b", "blog", [0.97, 0.24])
+    graph.recompute_edges_for(con, ["b"], floor=0.5)      # adding b links a-b
+    assert _edge_set(con) == {("a", "b")}
+    con.close()
+
+
+def test_delete_edges_for_removes_incident(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    _seed_item(con, "b", "blog", [0.97, 0.24])
+    graph.recompute_edges_for(con, ["a", "b"], floor=0.5)
+    graph.delete_edges_for(con, ["b"])
+    assert _edge_set(con) == set()
+    con.close()
