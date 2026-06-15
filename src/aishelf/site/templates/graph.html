@@ -21,6 +21,7 @@
 </div>
 <style>
   main:has(.graph-wrap) { max-width: none; padding: 0; }
+  /* 57px ≈ the top nav height (.topbar: 12px padding top+bottom + ~33px content) */
   .graph-wrap { position: relative; display: flex; flex-direction: column; height: calc(100vh - 57px); height: calc(100dvh - 57px); }
   .graph-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #e6ecf4; background: #fff; flex: none; }
   .graph-title { font-weight: 700; color: #11203a; }
@@ -102,8 +103,8 @@
     document.querySelectorAll('#graphFilters button').forEach((x) => x.classList.toggle('on', x === b));
     const f = b.dataset.f;
     cy.nodes().forEach((n) => n.style('display', (f === 'all' || n.data('type') === f) ? 'element' : 'none'));
-    cy.edges().forEach((ed) => ed.style('display',
-      (ed.source().style('display') !== 'none' && ed.target().style('display') !== 'none') ? 'element' : 'none'));
+    cy.edges().forEach((ed) =>
+      ed.style('display', (!ed.source().hidden() && !ed.target().hidden()) ? 'element' : 'none'));
   });
 
   // Search highlight.
