@@ -77,3 +77,42 @@ def test_delete_edges_for_removes_incident(tmp_path):
     graph.delete_edges_for(con, ["b"])
     assert _edge_set(con) == set()
     con.close()
+
+
+def test_load_graph_shape_and_degree(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    _seed_item(con, "b", "blog", [0.97, 0.24])
+    graph.recompute_edges_for(con, ["a", "b"], floor=0.5)
+    con.commit(); con.close()
+    g = graph.load_graph(db, cap_k=8)
+    ids = {n["id"] for n in g["nodes"]}
+    assert ids == {"a", "b"}
+    a = next(n for n in g["nodes"] if n["id"] == "a")
+    assert a["type"] == "video" and a["title"] == "标题a" and a["degree"] == 1
+    assert g["edges"] == [{"source": "a", "target": "b", "weight": g["edges"][0]["weight"]}]
+    assert g["edges"][0]["weight"] > 0.9
+
+
+def test_load_graph_caps_top_k(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    # hub "h" connects to 3 leaves with descending weights; cap_k=2 keeps the 2 strongest
+    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('h','l1',0.9)")
+    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('h','l2',0.8)")
+    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('h','l3',0.6)")
+    for rid in ("h", "l1", "l2", "l3"):
+        _seed_item(con, rid, "blog", [1.0, 0.0])
+    con.commit(); con.close()
+    g = graph.load_graph(db, cap_k=2)
+    kept = {(e["source"], e["target"]) for e in g["edges"]}
+    assert ("h", "l1") in kept and ("h", "l2") in kept and ("h", "l3") not in kept
+
+
+def test_load_graph_empty(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db); schema.init_db(con); con.close()
+    assert graph.load_graph(db) == {"nodes": [], "edges": []}

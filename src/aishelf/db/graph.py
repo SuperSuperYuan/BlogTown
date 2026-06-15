@@ -75,6 +75,56 @@ def delete_edges_for(con, item_ids) -> None:
         con.execute("DELETE FROM edges WHERE src = ? OR dst = ?", (cid, cid))
 
 
+def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
+    """Nodes (id/type/title/author + degree) and edges, capping each node to its
+    top-K strongest incident edges (an edge survives if it is in the top-K of
+    either endpoint). Degree counts the kept edges."""
+    con = schema.connect(db_path)
+    try:
+        schema.init_db(con)
+        node_rows = con.execute("SELECT id, type, title, author FROM items").fetchall()
+        edge_rows = con.execute("SELECT src, dst, weight FROM edges").fetchall()
+    finally:
+        con.close()
+
+    incident: dict[str, list[tuple[float, str, str]]] = {}
+    wmap: dict[tuple[str, str], float] = {}
+    for r in edge_rows:
+        wmap[(r["src"], r["dst"])] = r["weight"]
+        incident.setdefault(r["src"], []).append((r["weight"], r["src"], r["dst"]))
+        incident.setdefault(r["dst"], []).append((r["weight"], r["src"], r["dst"]))
+
+    # An edge survives if it is in the top-K of BOTH endpoints (intersection).
+    # This prevents low-weight dangling edges where a leaf's only connection
+    # is a weak tie excluded by the hub's top-K.
+    keep: set[tuple[str, str]] = set()
+    node_topk: dict[str, set[tuple[str, str]]] = {}
+    for nid, lst in incident.items():
+        lst.sort(key=lambda t: -t[0])
+        node_topk[nid] = {(s, d) for _w, s, d in lst[:cap_k]}
+
+    for edge_key in wmap:
+        s, d = edge_key
+        in_s = edge_key in node_topk.get(s, set())
+        in_d = edge_key in node_topk.get(d, set())
+        if in_s and in_d:
+            keep.add(edge_key)
+
+    degree: dict[str, int] = {}
+    edges = []
+    for (s, d) in keep:
+        edges.append({"source": s, "target": d, "weight": wmap[(s, d)]})
+        degree[s] = degree.get(s, 0) + 1
+        degree[d] = degree.get(d, 0) + 1
+
+    nodes = [
+        {"id": r["id"], "type": r["type"], "title": r["title"],
+         "author": r["author"], "degree": degree.get(r["id"], 0)}
+        for r in node_rows
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+
 def recompute_edges_for(con, item_ids, *, floor: float = GRAPH_SIM_FLOOR) -> None:
     """Recompute edges for the given (re)embedded items.
 
