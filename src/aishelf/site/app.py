@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict, replace
 
 from aishelf.contract.loader import load_items
+from aishelf.db import graph as db_graph
 from aishelf.db import search as db_search
 from aishelf.db import sync as db_sync
 from aishelf.db.config import default_db_path
@@ -296,6 +297,17 @@ def ask_chat(req: _ChatRequest):
         yield from llm.stream_completion(payload)
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.get("/graph", response_class=HTMLResponse)
+def graph_page(request: Request):
+    return templates.TemplateResponse(request, "graph.html", {})
+
+
+@app.get("/api/graph")
+def api_graph():
+    """Read-only semantic graph (nodes + top-K-capped edges) over the derived DB."""
+    return db_graph.load_graph(default_db_path(get_data_dir()))
 
 
 class _ScheduleRequest(BaseModel):
