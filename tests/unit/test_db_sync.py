@@ -49,7 +49,7 @@ def test_sync_inserts_rows_and_fts(tmp_path):
 def test_sync_unchanged_skips_on_second_run(tmp_path, monkeypatch):
     data, db = tmp_path / "data", tmp_path / "atlas.db"
     monkeypatch.setattr(embed, "model_name", lambda: None)
-    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: ["别名"] * len(pairs))
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)
     _write(data, "videos", "v1")
     sync(data, db)
     summary = sync(data, db)
@@ -289,6 +289,7 @@ def test_sync_stores_alias_for_new_item(tmp_path, monkeypatch):
     _write_video(data, "v1")
     db = tmp_path / "atlas.db"
     monkeypatch.setattr(embed, "model_name", lambda: None)              # isolate alias
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
     monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: ["别名一"] * len(pairs))
     sync(data, db)
     assert _alias_of(db, "v1") == "别名一"
@@ -299,7 +300,7 @@ def test_sync_skips_alias_when_unconfigured(tmp_path, monkeypatch):
     _write_video(data, "v1")
     db = tmp_path / "atlas.db"
     monkeypatch.setattr(embed, "model_name", lambda: None)
-    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)  # unconfigured/failed
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)
     sync(data, db)
     assert _alias_of(db, "v1") is None
 
@@ -309,6 +310,7 @@ def test_sync_regenerates_alias_on_title_change_not_note(tmp_path, monkeypatch):
     _write_video(data, "v1")
     db = tmp_path / "atlas.db"
     monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
     calls = {"n": 0}
 
     def _gen(pairs):
@@ -340,6 +342,7 @@ def test_sync_backfills_missing_alias_without_title_change(tmp_path, monkeypatch
     _write_video(data, "v1")
     db = tmp_path / "atlas.db"
     monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
     monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)        # first sync: gen fails
     sync(data, db)
     assert _alias_of(db, "v1") is None

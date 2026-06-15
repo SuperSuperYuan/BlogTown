@@ -116,7 +116,9 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             needs_emb = bool(embed_model) and (
                 prev is None or needs_index or prev[1] != embed_model or not prev[2]
             )
-            needs_alias = prev is None or it.title != prev[3] or not prev[4]
+            needs_alias = alias.is_configured() and (
+                prev is None or it.title != prev[3] or not prev[4]
+            )
             if not needs_index and not needs_emb and not needs_alias:
                 summary.unchanged += 1
                 continue
