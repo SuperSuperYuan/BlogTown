@@ -15,7 +15,7 @@ Three logical pieces (full write-up in [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 | Piece | Role |
 |---|---|
 | **Contract** (`aishelf.contract`) | Pydantic models + loader + JSON Schema for the two content modalities — the seam between collection and display. |
-| **Site** (`aishelf.site`) | FastAPI + Jinja2 server-rendered app: browse (videos / blogs / search / author), the Hermes collection chat, per-item notes, and delete. |
+| **Site** (`aishelf.site`) | FastAPI + Jinja2 server-rendered app: browse (videos / blogs / search / author), the Hermes collection chat, ask-your-library Q&A, a 3D knowledge graph, per-item notes, and delete. |
 | **Hermes** (external) | Crawls sources and writes `data/{videos,blogs}/<id>.json` directly, instructed by a system prompt that embeds the JSON Schema. |
 
 Data lives on disk under `data/` (gitignored): `data/videos/<id>.json`,
@@ -25,10 +25,12 @@ with no restart.
 
 A derived **SQLite + FTS5** index (`data/atlas.db`, also gitignored) mirrors the
 contract files and powers CJK-aware full-text search via the read-only
-`GET /api/search` endpoint. It's a rebuildable **view** — files stay the source
-of truth — synced after each collection and backfillable with
-`python -m aishelf.db sync`. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-for details.
+`GET /api/search` endpoint. The same DB also stores, when an embedding service is
+configured, a **per-item embedding vector**, a short LLM-generated **alias**, and
+a **similarity-edge table** — these power semantic `/ask` retrieval and the
+knowledge graph. It's a rebuildable **view** — files stay the source of truth —
+synced after each collection and backfillable with `python -m aishelf.db sync`.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details.
 
 ## Quick start
 
@@ -101,7 +103,8 @@ with `AISHELF_SCHEDULES=...`.
 |---|---|---|
 | `AISHELF_DATA_DIR` | `data` | Where content + notes are stored |
 | `AISHELF_DB_PATH` | `<data_dir>/atlas.db` | Derived SQLite search index |
-| `ATLAS_CHAT_BASE_URL` / `ATLAS_CHAT_API_KEY` / `ATLAS_CHAT_MODEL` | = the matching `HERMES_*` | Chat model that answers `/ask` questions (defaults to the Hermes connection) |
+| `ATLAS_CHAT_BASE_URL` / `ATLAS_CHAT_API_KEY` / `ATLAS_CHAT_MODEL` | = the matching `HERMES_*` | Chat model that answers `/ask` questions and generates graph node aliases (defaults to the Hermes connection) |
+| `ATLAS_EMBED_BASE_URL` / `ATLAS_EMBED_API_KEY` / `ATLAS_EMBED_MODEL` | — (unset ⇒ disabled) | Embedding service for semantic `/ask` retrieval + graph node placement (OpenAI-compatible, e.g. DashScope `text-embedding-v4`). Unset ⇒ `/ask` falls back to pure FTS5 and the graph uses non-semantic placement. |
 | `AISHELF_SITE_HOST` / `AISHELF_SITE_PORT` | `127.0.0.1` / `8001` | Site bind address |
 | `AISHELF_COLLECT_ALLOWLIST` | `config/collect_allowlist.txt` | Collect passcode allowlist |
 | `AISHELF_SCHEDULES` | `config/schedules.yaml` | Timed-collection config |
@@ -137,22 +140,42 @@ by design, so run `sync` once after first deploying with existing records.
 ## Ask your library
 
 `/ask` is a chat that answers questions over your collection — grounded in record
-summaries **and your notes** — and links each answer to its sources. Retrieval
-uses the same FTS5 index as `/api/search`; answers come from a chat model
-configured via `ATLAS_CHAT_*` (defaulting to your Hermes connection, so it works
-with no extra config). It is **ungated** (answering is cheap relative to
-collection) and multi-turn (history lives in your browser). After saving a note,
-the index refreshes so your note becomes searchable.
-
-Because the search index now also covers your notes, an existing deployment must
-run `python -m aishelf.db sync --rebuild` once after upgrading so the new note
-column is populated.
+summaries **and your notes** — and links each answer to its sources, presented
+through a playful **「智慧之咪」** assistant UI. Retrieval is **hybrid**: when an
+embedding service is configured (`ATLAS_EMBED_*`), it blends semantic vector
+search (so a Chinese question can match an English talk on the same topic) with
+the FTS5 keyword index, keeping only the relevant sources; without one it falls
+back to pure FTS5. Answers come from a chat model configured via `ATLAS_CHAT_*`
+(defaulting to your Hermes connection, so it works with no extra config). It is
+**ungated** (answering is cheap relative to collection) and multi-turn (history
+lives in your browser). After saving a note, the index refreshes so your note
+becomes searchable.
 
 The answer surfaces two next-action affordances when relevant: if you explicitly
 ask to open a video or blog (e.g. "打开那个 RAG 视频"), matching items appear as
 **jump-cards** linking to their detail pages; if the library has nothing relevant
 to your question, a **「去 Hermes 采集」** guide links to `/collect` with your
 question pre-filled (`/collect?q=...`) so you can collect it in one step.
+
+After upgrading an existing deployment, run `python -m aishelf.db sync --rebuild`
+once so the derived DB backfills its newer columns (note text, embeddings,
+aliases) and the graph edges.
+
+## Knowledge graph
+
+`/graph` renders your whole library as an interactive **3D wireframe globe**:
+each node is a content item placed on the sphere by **PCA of its embedding**, so
+semantically related items cluster together. Nodes are colored by type
+(video / blog), labeled with a short **DeepSeek-generated alias** (≤ 8 chars,
+full title on hover), and clicking one opens its detail page; drag to rotate,
+scroll to zoom. A type filter and a search box highlight matching nodes.
+
+Placement and aliases need an embedding service (`ATLAS_EMBED_*`) and the chat
+model (`ATLAS_CHAT_*`) respectively; without them the globe still renders with
+non-semantic placement and truncated-title labels. The underlying similarity
+edges live in the derived DB (`GET /api/graph` serves the nodes + edges as JSON)
+and are updated incrementally on each `sync`; run `sync --rebuild` once to
+backfill them on an existing deployment.
 
 ## Export the contract schema
 
@@ -180,4 +203,5 @@ under the `network` marker.
 - Design specs and implementation plans: `docs/superpowers/specs/` and
   `docs/superpowers/plans/` (one pair per feature — contract, display site,
   collect page, notes, delete, collect allowlist, scheduled collection,
-  derived SQLite DB).
+  derived SQLite DB, ask-your-library RAG, hybrid FTS5/semantic retrieval,
+  knowledge graph, and the 3D globe + node aliases).
