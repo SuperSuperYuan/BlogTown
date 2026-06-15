@@ -109,17 +109,34 @@
     n._label = label;
   }
 
+  // Edges as glowing tubes: thickness + brightness + color ramp by weight.
+  // (WebGL ignores Line thickness, so real weight signal needs tube geometry.)
+  // Normalize weight over the actual range present so differences are obvious.
+  const _weights = data.edges.map((e) => e.weight || 0.5);
+  const wMin = _weights.length ? Math.min(..._weights) : 0;
+  const wMax = _weights.length ? Math.max(..._weights) : 1;
+  const wSpan = (wMax - wMin) || 1;
+  const EDGE_LOW = new THREE.Color(0x1c4a7a);   // weak link: dim blue
+  const EDGE_HIGH = new THREE.Color(0x6ff2ff);  // strong link: bright cyan
   const edgeLines = [];
   for (const e of data.edges) {
     const a = byId[e.source], b = byId[e.target];
     if (!a || !b) continue;
+    const t = Math.min(1, Math.max(0, ((e.weight || 0.5) - wMin) / wSpan));
     const mid = a.position.clone().add(b.position).normalize().multiplyScalar(R * 1.28);
     const curve = new THREE.QuadraticBezierCurve3(a.position.clone(), mid, b.position.clone());
-    const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(24));
-    const mat = new THREE.LineBasicMaterial({ color: 0x39b9ff, transparent: true, opacity: 0.16 + 0.5 * Math.max(0, (e.weight || 0.5) - 0.4) });
-    const line = new THREE.Line(geo, mat);
-    line.userData = { source: e.source, target: e.target };
-    scene.add(line); edgeLines.push(line);
+    const radius = 0.35 + 2.0 * t;                       // thin -> thick
+    const geo = new THREE.TubeGeometry(curve, 24, radius, 8, false);
+    const mat = new THREE.MeshBasicMaterial({
+      color: EDGE_LOW.clone().lerp(EDGE_HIGH, t),        // dim -> bright
+      transparent: true,
+      opacity: 0.4 + 0.55 * t,                           // faint -> solid
+      blending: THREE.AdditiveBlending,                  // glow on the dark globe
+      depthWrite: false,
+    });
+    const tube = new THREE.Mesh(geo, mat);
+    tube.userData = { source: e.source, target: e.target };
+    scene.add(tube); edgeLines.push(tube);
   }
 
   const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
