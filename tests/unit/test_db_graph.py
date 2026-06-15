@@ -97,19 +97,22 @@ def test_load_graph_shape_and_degree(tmp_path):
 
 
 def test_load_graph_caps_top_k(tmp_path):
+    # Union top-K: an edge is dropped only when it is outside the top-K of BOTH
+    # endpoints. Here a-d (0.5) is the weakest for a AND for d, and both have two
+    # stronger edges, so with cap_k=2 a-d is dropped while the other four survive.
     db = tmp_path / "atlas.db"
     con = schema.connect(db)
     schema.init_db(con)
-    # hub "h" connects to 3 leaves with descending weights; cap_k=2 keeps the 2 strongest
-    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('h','l1',0.9)")
-    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('h','l2',0.8)")
-    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('h','l3',0.6)")
-    for rid in ("h", "l1", "l2", "l3"):
+    for src, dst, w in [("a", "b", 0.9), ("a", "c", 0.85), ("a", "d", 0.5),
+                        ("b", "d", 0.9), ("c", "d", 0.85)]:
+        con.execute("INSERT INTO edges (src, dst, weight) VALUES (?,?,?)", (src, dst, w))
+    for rid in ("a", "b", "c", "d"):
         _seed_item(con, rid, "blog", [1.0, 0.0])
     con.commit(); con.close()
     g = graph.load_graph(db, cap_k=2)
     kept = {(e["source"], e["target"]) for e in g["edges"]}
-    assert ("h", "l1") in kept and ("h", "l2") in kept and ("h", "l3") not in kept
+    assert ("a", "d") not in kept                       # outside top-2 of both a and d
+    assert kept == {("a", "b"), ("a", "c"), ("b", "d"), ("c", "d")}
 
 
 def test_load_graph_empty(tmp_path):

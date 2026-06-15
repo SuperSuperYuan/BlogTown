@@ -94,21 +94,11 @@ def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
         incident.setdefault(r["src"], []).append((r["weight"], r["src"], r["dst"]))
         incident.setdefault(r["dst"], []).append((r["weight"], r["src"], r["dst"]))
 
-    # An edge survives if it is in the top-K of BOTH endpoints (intersection).
-    # This prevents low-weight dangling edges where a leaf's only connection
-    # is a weak tie excluded by the hub's top-K.
     keep: set[tuple[str, str]] = set()
-    node_topk: dict[str, set[tuple[str, str]]] = {}
-    for nid, lst in incident.items():
+    for _nid, lst in incident.items():
         lst.sort(key=lambda t: -t[0])
-        node_topk[nid] = {(s, d) for _w, s, d in lst[:cap_k]}
-
-    for edge_key in wmap:
-        s, d = edge_key
-        in_s = edge_key in node_topk.get(s, set())
-        in_d = edge_key in node_topk.get(d, set())
-        if in_s and in_d:
-            keep.add(edge_key)
+        for _w, s, d in lst[:cap_k]:
+            keep.add((s, d))
 
     degree: dict[str, int] = {}
     edges = []
