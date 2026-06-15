@@ -87,6 +87,11 @@ def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
     finally:
         con.close()
 
+    # Drop any edge whose endpoint has no item row (defensive: a malformed/stale
+    # edge would otherwise make the frontend graph library throw on a missing node).
+    node_ids = {r["id"] for r in node_rows}
+    edge_rows = [r for r in edge_rows if r["src"] in node_ids and r["dst"] in node_ids]
+
     incident: dict[str, list[tuple[float, str, str]]] = {}
     wmap: dict[tuple[str, str], float] = {}
     for r in edge_rows:

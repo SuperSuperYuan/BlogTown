@@ -119,3 +119,17 @@ def test_load_graph_empty(tmp_path):
     db = tmp_path / "atlas.db"
     con = schema.connect(db); schema.init_db(con); con.close()
     assert graph.load_graph(db) == {"nodes": [], "edges": []}
+
+
+def test_load_graph_drops_orphan_edges(tmp_path):
+    # An edge whose endpoint has no item row must not appear in the output
+    # (it would make the frontend graph library throw on a missing node).
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    con.execute("INSERT INTO edges (src, dst, weight) VALUES ('a','ghost',0.9)")
+    con.commit(); con.close()
+    g = graph.load_graph(db)
+    assert g["edges"] == []                                   # orphan edge dropped
+    assert next(n for n in g["nodes"] if n["id"] == "a")["degree"] == 0
