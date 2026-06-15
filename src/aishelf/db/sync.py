@@ -166,7 +166,7 @@ def sync(data_dir, db_path=None) -> SyncSummary:
         if stale:
             graph.delete_edges_for(con, stale)
         if embedded_ids:
-            graph.recompute_edges_for(con, embedded_ids)
+            graph.recompute_edges_for(con, embedded_ids, floor=graph.GRAPH_SIM_FLOOR)
 
         con.commit()
         return summary

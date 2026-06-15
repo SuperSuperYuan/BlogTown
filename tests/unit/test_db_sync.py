@@ -1,7 +1,7 @@
 import json
 
 from aishelf import embed
-from aishelf.db import schema, vector
+from aishelf.db import schema, vector, graph as _graph
 from aishelf.db.sync import sync
 
 
@@ -225,9 +225,6 @@ def test_sync_skips_embedding_on_vector_count_mismatch(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # Knowledge-graph edge tests (Task 5)
 # ---------------------------------------------------------------------------
-
-from aishelf.db import graph as _graph
-
 
 def _edges(db_path):
     con = schema.connect(db_path)
