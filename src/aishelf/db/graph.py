@@ -78,11 +78,10 @@ def _sphere_positions(node_ids: list[str], groups: dict) -> dict[str, tuple[floa
                 coords = centered @ vt[:3].T
                 if coords.shape[1] < 3:
                     coords = np.pad(coords, ((0, 0), (0, 3 - coords.shape[1])))
-                norms = np.linalg.norm(coords, axis=1, keepdims=True)
-                norms[norms == 0] = 1.0
-                unit = coords / norms
-                for sid, row in zip(ids, unit):
-                    pos[sid] = (float(row[0]), float(row[1]), float(row[2]))
+                norms = np.linalg.norm(coords, axis=1)
+                for sid, row, nrm in zip(ids, coords, norms):
+                    if nrm > 1e-9:   # zero-norm row (degenerate) -> hash fallback below
+                        pos[sid] = (float(row[0] / nrm), float(row[1] / nrm), float(row[2] / nrm))
             except np.linalg.LinAlgError:
                 pass
     for sid in node_ids:
@@ -118,9 +117,7 @@ def delete_edges_for(con, item_ids) -> None:
 
 
 def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
-    """Nodes (id/type/title/author + degree) and edges, capping each node to its
-    top-K strongest incident edges (an edge survives if it is in the top-K of
-    either endpoint). Degree counts the kept edges."""
+    """Nodes (id/type/title/alias/degree + unit-sphere x,y,z) and edges, capping each node to its top-K strongest incident edges (an edge survives if it is in the top-K of either endpoint). Degree counts the kept edges."""
     con = schema.connect(db_path)
     try:
         schema.init_db(con)

@@ -1,3 +1,5 @@
+import math
+
 from aishelf.db import schema
 
 
@@ -143,9 +145,6 @@ def test_items_table_has_alias_column(tmp_path):
     assert "alias" in cols
 
 
-import math
-
-
 def test_hash_point_on_unit_sphere_and_deterministic():
     p1 = graph._hash_point("abc")
     p2 = graph._hash_point("abc")
@@ -186,3 +185,18 @@ def test_load_graph_hash_position_when_no_embedding(tmp_path):
     x = next(n for n in g["nodes"] if n["id"] == "x")
     norm = math.sqrt(x["x"] ** 2 + x["y"] ** 2 + x["z"] ** 2)
     assert math.isclose(norm, 1.0, abs_tol=1e-5)   # hash placement, still unit-norm
+
+
+def test_load_graph_identical_embeddings_stay_on_sphere(tmp_path):
+    # All-identical embeddings make the PCA projection degenerate (all-zero);
+    # nodes must fall back to hash placement (unit-norm), not collapse to (0,0,0).
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    for rid in ("a", "b", "c"):
+        _seed_item(con, rid, "blog", [1.0, 0.0, 0.0])
+    con.commit(); con.close()
+    g = graph.load_graph(db)
+    for n in g["nodes"]:
+        norm = math.sqrt(n["x"] ** 2 + n["y"] ** 2 + n["z"] ** 2)
+        assert math.isclose(norm, 1.0, abs_tol=1e-5)
