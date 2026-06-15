@@ -31,7 +31,11 @@ def main(argv=None) -> int:
     if args.command == "sync":
         if args.rebuild:
             con = schema.connect(db_path)
-            con.executescript("DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS items_fts;")
+            con.executescript(
+                "DROP TABLE IF EXISTS items; "
+                "DROP TABLE IF EXISTS items_fts; "
+                "DROP TABLE IF EXISTS edges;"
+            )
             con.commit()
             con.close()
         s = sync_mod.sync(data_dir, db_path)
