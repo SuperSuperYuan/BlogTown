@@ -133,3 +133,11 @@ def test_load_graph_drops_orphan_edges(tmp_path):
     g = graph.load_graph(db)
     assert g["edges"] == []                                   # orphan edge dropped
     assert next(n for n in g["nodes"] if n["id"] == "a")["degree"] == 0
+
+
+def test_items_table_has_alias_column(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(items)")}
+    con.close()
+    assert "alias" in cols
