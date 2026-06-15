@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 from aishelf import alias
@@ -69,3 +70,50 @@ def test_client_error_returns_none(monkeypatch):
 
     monkeypatch.setattr(alias, "get_client", _boom)
     assert alias.generate_aliases([("a", "")]) is None
+
+
+class _CountingCompletions:
+    def __init__(self):
+        self.calls = 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        count = kwargs["messages"][0]["content"].count("｜")   # one separator per item line
+        arr = json.dumps([f"别名{i}" for i in range(count)], ensure_ascii=False)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=arr))])
+
+
+class _CountingClient:
+    def __init__(self):
+        self.chat = SimpleNamespace(completions=_CountingCompletions())
+
+
+def test_generate_aliases_batches_and_reassembles(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "ALIAS_BATCH_SIZE", 2)
+    client = _CountingClient()
+    monkeypatch.setattr(alias, "get_client", lambda s: client)
+    out = alias.generate_aliases([(f"t{i}", "s") for i in range(5)])
+    assert out is not None and len(out) == 5            # 2+2+1 batches reassembled in order
+    assert client.chat.completions.calls == 3
+
+
+def test_generate_aliases_batch_failure_returns_none(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "ALIAS_BATCH_SIZE", 2)
+
+    class _FailSecond:
+        def __init__(self):
+            self.n = 0
+
+        def create(self, **kwargs):
+            self.n += 1
+            if self.n == 2:
+                raise RuntimeError("batch 2 down")
+            count = kwargs["messages"][0]["content"].count("｜")
+            arr = json.dumps([f"x{i}" for i in range(count)], ensure_ascii=False)
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=arr))])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=_FailSecond()))
+    monkeypatch.setattr(alias, "get_client", lambda s: client)
+    assert alias.generate_aliases([("a", ""), ("b", ""), ("c", "")]) is None  # batch-2 failure -> all None
