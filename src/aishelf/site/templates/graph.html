@@ -109,15 +109,17 @@
     n._label = label;
   }
 
-  // Edges as glowing tubes: thickness + brightness + color ramp by weight.
-  // (WebGL ignores Line thickness, so real weight signal needs tube geometry.)
-  // Normalize weight over the actual range present so differences are obvious.
+  // Edges: uniform thin tubes; relevance shown by BRIGHTNESS + COLOR (dim blue ->
+  // bright cyan) ramped by the similarity weight, normalized over the actual range
+  // so differences read clearly. Additive blending makes strong links glow.
+  // (Thin uniform tubes also raycast cleanly for the hover-coefficient readout.)
   const _weights = data.edges.map((e) => e.weight || 0.5);
   const wMin = _weights.length ? Math.min(..._weights) : 0;
   const wMax = _weights.length ? Math.max(..._weights) : 1;
   const wSpan = (wMax - wMin) || 1;
-  const EDGE_LOW = new THREE.Color(0x1c4a7a);   // weak link: dim blue
-  const EDGE_HIGH = new THREE.Color(0x6ff2ff);  // strong link: bright cyan
+  const EDGE_LOW = new THREE.Color(0x244a73);   // weak link: dim blue
+  const EDGE_HIGH = new THREE.Color(0x8af6ff);  // strong link: bright cyan
+  const EDGE_RADIUS = 0.45;                      // uniform, thin
   const edgeLines = [];
   for (const e of data.edges) {
     const a = byId[e.source], b = byId[e.target];
@@ -125,41 +127,69 @@
     const t = Math.min(1, Math.max(0, ((e.weight || 0.5) - wMin) / wSpan));
     const mid = a.position.clone().add(b.position).normalize().multiplyScalar(R * 1.28);
     const curve = new THREE.QuadraticBezierCurve3(a.position.clone(), mid, b.position.clone());
-    const radius = 0.35 + 2.0 * t;                       // thin -> thick
-    const geo = new THREE.TubeGeometry(curve, 24, radius, 8, false);
+    const geo = new THREE.TubeGeometry(curve, 20, EDGE_RADIUS, 6, false);
+    const baseOpacity = 0.22 + 0.6 * t;          // faint -> solid (relevance)
+    const baseColor = EDGE_LOW.clone().lerp(EDGE_HIGH, t);
     const mat = new THREE.MeshBasicMaterial({
-      color: EDGE_LOW.clone().lerp(EDGE_HIGH, t),        // dim -> bright
+      color: baseColor.clone(),
       transparent: true,
-      opacity: 0.4 + 0.55 * t,                           // faint -> solid
-      blending: THREE.AdditiveBlending,                  // glow on the dark globe
+      opacity: baseOpacity,
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     const tube = new THREE.Mesh(geo, mat);
-    tube.userData = { source: e.source, target: e.target };
+    tube.userData = { source: e.source, target: e.target, weight: e.weight || 0.5,
+                      baseOpacity: baseOpacity, baseColor: baseColor };
     scene.add(tube); edgeLines.push(tube);
   }
 
   const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
-  let hovered = null;
+  let hovered = null, litEdge = null;
+  function clearEdge() {
+    if (litEdge) {
+      litEdge.material.opacity = litEdge.userData.baseOpacity;
+      litEdge.material.color.copy(litEdge.userData.baseColor);
+      litEdge = null;
+    }
+  }
+  function showTip(ev, rect, text) {
+    tip.hidden = false;
+    tip.textContent = text;
+    tip.style.left = (ev.clientX - rect.left + 14) + 'px';
+    tip.style.top = (ev.clientY - rect.top + 14) + 'px';
+  }
   renderer.domElement.addEventListener('mousemove', (ev) => {
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     ray.setFromCamera(mouse, camera);
-    const hit = ray.intersectObjects(nodeMeshes)[0];
-    if (hit) {
-      hovered = hit.object;
-      tip.hidden = false;
-      tip.textContent = hovered.userData.title;
-      tip.style.left = (ev.clientX - rect.left + 14) + 'px';
-      tip.style.top = (ev.clientY - rect.top + 14) + 'px';
+    const nodeHit = ray.intersectObjects(nodeMeshes.filter((m) => m.visible))[0];
+    if (nodeHit) {                               // node: show its full title
+      hovered = nodeHit.object; clearEdge();
+      showTip(ev, rect, hovered.userData.title);
       renderer.domElement.style.cursor = 'pointer';
       controls.autoRotate = false;
-    } else {
-      hovered = null; tip.hidden = true;
-      renderer.domElement.style.cursor = 'grab';
-      controls.autoRotate = true;
+      return;
     }
+    hovered = null;
+    const edgeHit = ray.intersectObjects(edgeLines.filter((m) => m.visible))[0];
+    if (edgeHit) {                               // edge: show the similarity coefficient
+      const ed = edgeHit.object;
+      if (litEdge !== ed) {
+        clearEdge();
+        litEdge = ed;
+        ed.material.opacity = 1;                 // pop the hovered link
+        ed.material.color.set(0xffffff);
+      }
+      showTip(ev, rect, '相似度 ' + ed.userData.weight.toFixed(2));
+      renderer.domElement.style.cursor = 'default';
+      controls.autoRotate = false;
+      return;
+    }
+    clearEdge();
+    tip.hidden = true;
+    renderer.domElement.style.cursor = 'grab';
+    controls.autoRotate = true;
   });
   renderer.domElement.addEventListener('click', () => {
     if (hovered && hovered.userData.href) window.open(hovered.userData.href, '_blank', 'noopener');
