@@ -141,3 +141,48 @@ def test_items_table_has_alias_column(tmp_path):
     cols = {r["name"] for r in con.execute("PRAGMA table_info(items)")}
     con.close()
     assert "alias" in cols
+
+
+import math
+
+
+def test_hash_point_on_unit_sphere_and_deterministic():
+    p1 = graph._hash_point("abc")
+    p2 = graph._hash_point("abc")
+    assert p1 == p2
+    assert math.isclose(math.sqrt(sum(c * c for c in p1)), 1.0, abs_tol=1e-5)
+
+
+def test_load_graph_nodes_have_alias_and_unit_position(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0, 0.1])
+    _seed_item(con, "b", "blog", [0.9, 0.2, 0.0])
+    _seed_item(con, "c", "video", [0.0, 1.0, 0.2])
+    con.execute("UPDATE items SET alias='甲' WHERE id='a'")
+    con.commit(); con.close()
+    g = graph.load_graph(db)
+    a = next(n for n in g["nodes"] if n["id"] == "a")
+    assert a["alias"] == "甲"
+    assert {"x", "y", "z"} <= set(a.keys())
+    norm = math.sqrt(a["x"] ** 2 + a["y"] ** 2 + a["z"] ** 2)
+    assert math.isclose(norm, 1.0, abs_tol=1e-5)
+    b = next(n for n in g["nodes"] if n["id"] == "b")
+    assert b["alias"] == ""          # no alias -> "" (frontend truncates the title)
+
+
+def test_load_graph_hash_position_when_no_embedding(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    con.execute(
+        "INSERT INTO items (id, type, title, author, platform, source_url, "
+        "published_at, collected_at, summary, keywords, content_hash, synced_at) "
+        "VALUES ('x','blog','标题x','作者','p','https://x/x','2024-01-01',"
+        "'2024-01-02','s','[]','h','2024-01-02')")
+    con.commit(); con.close()
+    g = graph.load_graph(db)
+    x = next(n for n in g["nodes"] if n["id"] == "x")
+    norm = math.sqrt(x["x"] ** 2 + x["y"] ** 2 + x["z"] ** 2)
+    assert math.isclose(norm, 1.0, abs_tol=1e-5)   # hash placement, still unit-norm
