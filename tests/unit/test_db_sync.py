@@ -1,6 +1,7 @@
 import json
 
 from aishelf import embed
+from aishelf import alias as _alias
 from aishelf.db import schema, vector, graph as _graph
 from aishelf.db.sync import sync
 
@@ -45,8 +46,10 @@ def test_sync_inserts_rows_and_fts(tmp_path):
     assert [r[0] for r in fts] == ["v1"]
 
 
-def test_sync_unchanged_skips_on_second_run(tmp_path):
+def test_sync_unchanged_skips_on_second_run(tmp_path, monkeypatch):
     data, db = tmp_path / "data", tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: ["别名"] * len(pairs))
     _write(data, "videos", "v1")
     sync(data, db)
     summary = sync(data, db)
@@ -268,3 +271,79 @@ def test_sync_drops_edges_for_removed_item(tmp_path, monkeypatch):
     (data / "videos" / "v2.json").unlink()   # delete one item's file
     sync(data, db)
     assert _edges(db) == set()                # its edge is gone
+
+
+# ---------------------------------------------------------------------------
+# Alias tests (Task 3)
+# ---------------------------------------------------------------------------
+
+def _alias_of(db_path, vid):
+    con = schema.connect(db_path)
+    row = con.execute("SELECT alias FROM items WHERE id=?", (vid,)).fetchone()
+    con.close()
+    return row["alias"]
+
+
+def test_sync_stores_alias_for_new_item(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)              # isolate alias
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: ["别名一"] * len(pairs))
+    sync(data, db)
+    assert _alias_of(db, "v1") == "别名一"
+
+
+def test_sync_skips_alias_when_unconfigured(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)  # unconfigured/failed
+    sync(data, db)
+    assert _alias_of(db, "v1") is None
+
+
+def test_sync_regenerates_alias_on_title_change_not_note(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    calls = {"n": 0}
+
+    def _gen(pairs):
+        calls["n"] += 1
+        return [f"别名{calls['n']}"] * len(pairs)
+
+    monkeypatch.setattr(_alias, "generate_aliases", _gen)
+    sync(data, db)
+    assert calls["n"] == 1 and _alias_of(db, "v1") == "别名1"
+
+    # note-only change: alias must NOT regenerate
+    (data / "notes").mkdir(exist_ok=True)
+    (data / "notes" / "v1.json").write_text(
+        json.dumps({"id": "v1", "text": "新笔记", "updated_at": "2024-02-01"}, ensure_ascii=False),
+        encoding="utf-8")
+    sync(data, db)
+    assert calls["n"] == 1 and _alias_of(db, "v1") == "别名1"
+
+    # title change: alias regenerates
+    rec = json.loads((data / "videos" / "v1.json").read_text(encoding="utf-8"))
+    rec["title"] = "全新的标题"
+    (data / "videos" / "v1.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    sync(data, db)
+    assert calls["n"] == 2 and _alias_of(db, "v1") == "别名2"
+
+
+def test_sync_backfills_missing_alias_without_title_change(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)        # first sync: gen fails
+    sync(data, db)
+    assert _alias_of(db, "v1") is None
+    # same title, generation now works -> alias backfilled (missing-alias retry, no title change)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: ["补的别名"] * len(pairs))
+    sync(data, db)
+    assert _alias_of(db, "v1") == "补的别名"

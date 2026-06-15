@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from aishelf.contract.loader import load_items
-from aishelf import embed
+from aishelf import embed, alias
 from aishelf.db import schema, tokenize, vector, graph
 from aishelf.db.config import default_db_path
 
@@ -86,16 +86,19 @@ def sync(data_dir, db_path=None) -> SyncSummary:
         schema.init_db(con)
         summary = SyncSummary()
         existing = {
-            r["id"]: (r["content_hash"], r["embedding_model"], r["has_emb"])
+            r["id"]: (r["content_hash"], r["embedding_model"], r["has_emb"],
+                      r["title"], r["has_alias"])
             for r in con.execute(
                 "SELECT id, content_hash, embedding_model, "
-                "(embedding IS NOT NULL) AS has_emb FROM items"
+                "(embedding IS NOT NULL) AS has_emb, title, "
+                "(alias IS NOT NULL AND alias != '') AS has_alias FROM items"
             )
         }
         synced_at = datetime.now(timezone.utc).isoformat()
         seen: set[str] = set()
         embed_model = embed.model_name()  # None when unconfigured
         to_embed: list[tuple] = []        # (item, note) needing (re)embedding
+        to_alias: list = []               # items needing a (re)generated alias
 
         placeholders = ", ".join(f":{c}" for c in _COLUMNS)
         updates = ", ".join(f"{c}=excluded.{c}" for c in _COLUMNS if c != "id")
@@ -113,7 +116,8 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             needs_emb = bool(embed_model) and (
                 prev is None or needs_index or prev[1] != embed_model or not prev[2]
             )
-            if not needs_index and not needs_emb:
+            needs_alias = prev is None or it.title != prev[3] or not prev[4]
+            if not needs_index and not needs_emb and not needs_alias:
                 summary.unchanged += 1
                 continue
             if needs_index:
@@ -137,6 +141,8 @@ def sync(data_dir, db_path=None) -> SyncSummary:
                     summary.added += 1
             if needs_emb:
                 to_embed.append((it, note))
+            if needs_alias:
+                to_alias.append(it)
 
         embedded_ids: list[str] = []
         if to_embed and embed_model:
@@ -153,6 +159,17 @@ def sync(data_dir, db_path=None) -> SyncSummary:
                 logger.warning(
                     "embed_texts returned %d vectors for %d texts; skipping embedding update",
                     len(vectors), len(to_embed),
+                )
+
+        if to_alias:
+            new_aliases = alias.generate_aliases([(it.title, it.summary) for it in to_alias])
+            if new_aliases and len(new_aliases) == len(to_alias):
+                for it, a in zip(to_alias, new_aliases):
+                    con.execute("UPDATE items SET alias=? WHERE id=?", (a, it.id))
+            elif new_aliases:
+                logger.warning(
+                    "generate_aliases returned %d for %d items; skipping alias update",
+                    len(new_aliases), len(to_alias),
                 )
 
         stale = [i for i in existing if i not in seen]
