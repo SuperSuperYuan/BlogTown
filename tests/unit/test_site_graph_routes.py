@@ -33,8 +33,9 @@ def test_graph_page_renders(client):
     r = client.get("/graph")
     assert r.status_code == 200
     assert "/api/graph" in r.text
-    assert "cytoscape" in r.text
-    assert 'id="cy"' in r.text
+    assert "three@0.128" in r.text          # Three.js CDN pin
+    assert 'id="globe"' in r.text           # the WebGL container
+    assert "OrbitControls" in r.text        # rotate/zoom controls
 
 
 def test_nav_has_graph_link(client):
