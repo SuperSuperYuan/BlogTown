@@ -150,12 +150,17 @@
 
   document.getElementById('globeFilters').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
+    document.getElementById('globeSearch').value = '';
     document.querySelectorAll('#globeFilters button').forEach((x) => x.classList.toggle('on', x === b));
     const f = b.dataset.f;
     for (const m of nodeMeshes) {
       const vis = (f === 'all' || m.userData.type === f);
       m.visible = vis;
-      if (m.userData._label) m.userData._label.visible = vis;
+      m.material.opacity = 1;
+      if (m.userData._label) {
+        m.userData._label.visible = vis;
+        m.userData._label.element.style.opacity = '1';
+      }
     }
     for (const line of edgeLines) {
       line.visible = byId[line.userData.source].visible && byId[line.userData.target].visible;
