@@ -15,7 +15,7 @@ from pathlib import Path
 
 from aishelf.contract.loader import load_items
 from aishelf import embed
-from aishelf.db import schema, tokenize, vector
+from aishelf.db import schema, tokenize, vector, graph
 from aishelf.db.config import default_db_path
 
 logger = logging.getLogger(__name__)
@@ -138,6 +138,7 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             if needs_emb:
                 to_embed.append((it, note))
 
+        embedded_ids: list[str] = []
         if to_embed and embed_model:
             vectors = embed.embed_texts([_embed_text(it, note) for it, note in to_embed])
             if vectors and len(vectors) == len(to_embed):
@@ -147,6 +148,7 @@ def sync(data_dir, db_path=None) -> SyncSummary:
                         "WHERE id=?",
                         (vector.pack(vec), embed_model, len(vec), it.id),
                     )
+                    embedded_ids.append(it.id)
             elif vectors:
                 logger.warning(
                     "embed_texts returned %d vectors for %d texts; skipping embedding update",
@@ -158,6 +160,13 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             con.execute("DELETE FROM items WHERE id = ?", (rid,))
             con.execute("DELETE FROM items_fts WHERE item_id = ?", (rid,))
         summary.removed = len(stale)
+
+        # Knowledge-graph edges: drop pruned items' edges, then recompute changed
+        # items' edges against the post-prune embedding set.
+        if stale:
+            graph.delete_edges_for(con, stale)
+        if embedded_ids:
+            graph.recompute_edges_for(con, embedded_ids, floor=graph.GRAPH_SIM_FLOOR)
 
         con.commit()
         return summary

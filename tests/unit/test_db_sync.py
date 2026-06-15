@@ -1,7 +1,7 @@
 import json
 
 from aishelf import embed
-from aishelf.db import schema, vector
+from aishelf.db import schema, vector, graph as _graph
 from aishelf.db.sync import sync
 
 
@@ -220,3 +220,51 @@ def test_sync_skips_embedding_on_vector_count_mismatch(tmp_path, monkeypatch):
     assert summary.added == 2
     assert _embedding_row(db, "v1")["embedding"] is None
     assert _embedding_row(db, "v2")["embedding"] is None
+
+
+# ---------------------------------------------------------------------------
+# Knowledge-graph edge tests (Task 5)
+# ---------------------------------------------------------------------------
+
+def _edges(db_path):
+    con = schema.connect(db_path)
+    rows = {(r["src"], r["dst"]) for r in con.execute("SELECT src, dst FROM edges")}
+    con.close()
+    return rows
+
+
+def test_sync_builds_edges_for_similar_items(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0], [0.98, 0.2]][: len(texts)])
+    monkeypatch.setattr(_graph, "GRAPH_SIM_FLOOR", 0.5)
+    sync(data, db)
+    assert _edges(db) == {("v1", "v2")}
+
+
+def test_sync_no_edges_when_embeddings_unconfigured(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    sync(data, db)
+    assert _edges(db) == set()
+
+
+def test_sync_drops_edges_for_removed_item(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0], [0.98, 0.2]][: len(texts)])
+    monkeypatch.setattr(_graph, "GRAPH_SIM_FLOOR", 0.5)
+    sync(data, db)
+    assert _edges(db) == {("v1", "v2")}
+    (data / "videos" / "v2.json").unlink()   # delete one item's file
+    sync(data, db)
+    assert _edges(db) == set()                # its edge is gone

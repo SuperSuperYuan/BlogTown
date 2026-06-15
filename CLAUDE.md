@@ -64,13 +64,22 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `sync --rebuild`), `tokenize.py` (CJK bigram `bigrams`/`to_match_query`),
   `sync.py` (idempotent `sync` — upsert + prune; when `ATLAS_EMBED_*` is
   configured, also computes and stores embeddings incrementally, re-embedding
-  new/changed items and any whose stored model differs from the current one;
-  embedding failure leaves rows intact without crashing), `vector.py`
+  new/changed items and any whose stored model differs from the current one,
+  then updates `edges` incrementally — recomputing edges for the (re)embedded
+  ids and deleting edges of pruned items, all in the same transaction; empty
+  graph when embeddings are unconfigured; embedding failure leaves rows intact
+  without crashing), `vector.py`
   (float32 BLOB `pack`/`unpack`, `load_embeddings`, and brute-force numpy
   `cosine_search` — no vector index, exhaustive cosine over the corpus),
   `search.py` (`search` over FTS5; `get_by_ids` hydrates items by id into a
-  `{id: SearchHit}` map), `__main__.py` (CLI). The DB is a rebuildable view;
-  files stay the source of truth.
+  `{id: SearchHit}` map), `graph.py` (semantic knowledge graph: `neighbors`
+  cosine ≥ `GRAPH_SIM_FLOOR`; `recompute_edges_for`/`delete_edges_for` for
+  incremental edge maintenance; `load_graph` reads nodes + edges with per-node
+  top-K=`GRAPH_TOP_K` cap; constants `GRAPH_SIM_FLOOR=0.5`, `GRAPH_TOP_K=8`),
+  `__main__.py` (CLI). `schema.py` also creates the `edges` table (`src TEXT,
+  dst TEXT, weight REAL, PRIMARY KEY(src,dst)` — undirected, stored canonically
+  with `src < dst`). The DB is a rebuildable view; files stay the source of
+  truth.
 
 **Data & storage** (`data/`, gitignored):
 
@@ -91,10 +100,13 @@ any time (`python -m aishelf.db sync`). It is synced after each collection
 (scheduled runs, and off-thread after manual chat collection); saving a note also
 triggers an off-thread re-sync so the updated note is searchable immediately.
 The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
-browse/search pages still read files. Initial deployment must run one
-`python -m aishelf.db sync --rebuild` to populate all columns including `note`
-and (when `ATLAS_EMBED_*` is configured) to backfill embeddings for hybrid `/ask`
-retrieval (no startup/periodic sync by design).
+browse/search pages still read files. `GET /graph` renders the semantic
+knowledge graph (Cytoscape.js, nodes + edges from `atlas.db`); `GET /api/graph`
+serves the raw `{nodes, edges}` JSON. Initial deployment must run one
+`python -m aishelf.db sync --rebuild` to populate all columns including `note`,
+backfill embeddings (when `ATLAS_EMBED_*` is configured) for hybrid `/ask`
+retrieval, and backfill the `edges` table for `/graph` (no startup/periodic sync
+by design).
 
 **Key conventions**
 

@@ -1,8 +1,8 @@
 # Atlas — Architecture Summary
 
 **Status:** MVP + collection access control + scheduling + derived SQLite
-search DB + ask-your-library RAG chat + hybrid FTS5/semantic retrieval
-(2026-06-10). 246 tests passing.
+search DB + ask-your-library RAG chat + hybrid FTS5/semantic retrieval +
+knowledge graph (2026-06-15). 264 tests passing.
 
 Atlas is a personal, local web app for collecting and browsing AI-domain content
 (interview/technical-talk **videos** and **blog/document** articles) from across
@@ -111,12 +111,13 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | File | Responsibility |
 |---|---|
 | `config.py` | `default_db_path(data_dir)` ← `AISHELF_DB_PATH` (default `<data_dir>/atlas.db`). |
-| `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author/**note**). The `note` column lets `/ask` and `/api/search` reach into your own annotations. Three nullable columns added for semantic retrieval: `embedding BLOB`, `embedding_model TEXT`, `embedding_dim INTEGER`. Existing deployments must run `python -m aishelf.db sync --rebuild` once to populate all new columns. |
+| `schema.py` | `connect`/`init_db` — the `items` table + external-content FTS5 `items_fts` (bigram-tokenized title/summary/keywords/author/**note**) + `edges` table (`src TEXT, dst TEXT, weight REAL, PRIMARY KEY(src,dst)` — undirected, stored canonically with `src < dst`). The `note` column lets `/ask` and `/api/search` reach into your own annotations. Three nullable columns added for semantic retrieval: `embedding BLOB`, `embedding_model TEXT`, `embedding_dim INTEGER`. Existing deployments must run `python -m aishelf.db sync --rebuild` once to populate all new columns and backfill `edges`. |
 | `tokenize.py` | `bigrams`/`to_match_query` (AND) + `to_match_query_or` (OR) — CJK bigram tokenization so Chinese text is searchable without word segmentation. |
-| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file (incl. its note text), prune rows whose file is gone. When `ATLAS_EMBED_*` is configured, also computes and stores embeddings incrementally (re-embeds new/changed items and any whose stored model name differs from the current one). Embedded text is `title + summary + keywords + note` — author is deliberately excluded. Embedding failure leaves rows intact without crashing; unconfigured ⇒ identical to before. |
+| `sync.py` | `sync(data_dir, db_path)` — idempotent: upsert every contract file (incl. its note text), prune rows whose file is gone. When `ATLAS_EMBED_*` is configured, also computes and stores embeddings incrementally (re-embeds new/changed items and any whose stored model name differs from the current one), then updates `edges` incrementally — `recompute_edges_for` on the (re)embedded ids and `delete_edges_for` on pruned items, all in the same transaction. Embedded text is `title + summary + keywords + note` — author is deliberately excluded. Embedding failure leaves rows intact without crashing; unconfigured ⇒ no embeddings, no edges (empty graph). |
 | `vector.py` | Float32 BLOB `pack`/`unpack`, `load_embeddings(db_path, dim)` (returns ids + an (N, dim) numpy matrix, filtered to rows whose stored dim matches the query dim), and brute-force `cosine_search`. No vector index — exhaustive cosine is sub-100 ms at personal-library scale. |
 | `search.py` | `search(db_path, q, *, type=None, limit, offset, mode="and")` — FTS5 query → structured hits, paginated; `mode="or"` is the lenient retrieval path used by `/ask`. `get_by_ids(db_path, ids)` hydrates a list of ids into a `{id: SearchHit}` map (used by the hybrid retrieval path). |
-| `__main__.py` | `python -m aishelf.db sync [--rebuild]` (backfill / drop+recreate). |
+| `graph.py` | Semantic knowledge graph over the embedded corpus. `neighbors(vec, ids, matrix, *, floor=GRAPH_SIM_FLOOR, exclude=None)` — cosine similarity pairs above `GRAPH_SIM_FLOOR` (0.5). `recompute_edges_for(con, ids)` / `delete_edges_for(con, ids)` — incremental edge maintenance (called from `sync`). `load_graph(db_path, *, cap_k)` — read side: all nodes + edges, each node's neighbour list capped to top-K=`GRAPH_TOP_K` (8) strongest edges by union over endpoints, with degree. |
+| `__main__.py` | `python -m aishelf.db sync [--rebuild]` (backfill / drop+recreate; `--rebuild` also drops `edges`). |
 
 ---
 
@@ -137,6 +138,8 @@ and off-thread after manual chat collection) and once at deploy to backfill.
 | `POST /schedules` | Create/edit (upsert by name) a schedule. **Gated** (400 bad name/time/empty prompt) |
 | `POST /schedules/{name}/toggle` | Enable/disable a schedule. **Gated** (404 unknown) |
 | `POST /schedules/{name}/delete` | Remove a schedule. **Gated** (404 unknown) |
+| `GET /graph` | Semantic knowledge-graph page (Cytoscape.js, fcose layout): nodes colored by type, sized by degree; click → detail page; type filter + search highlight; empty state when no embeddings. |
+| `GET /api/graph` | Read-only JSON `{nodes:[{id,type,title,author,degree}], edges:[{source,target,weight}]}` from `atlas.db`. |
 | `POST /notes/{id}` | Save a note (`{text}`) → `{ok, updated_at}` |
 | `POST /delete/{id}` | Delete record + note → `{ok}` (400 bad id, 404 unknown) |
 
@@ -183,6 +186,17 @@ otherwise `403`. Browsing, notes, and delete are not gated.
   cards to detail pages; when retrieval returns nothing (the relevance gate is
   inside `retrieve()`) it carries a `{collect}` guide to `/collect?q=<question>`
   (low-confidence check precedes jump-cards and suppresses them).
+- **Knowledge graph:** `GET /graph` calls `load_graph(db_path)` which reads all
+  nodes and edges from `atlas.db`. Edges are cosine similarity pairs with weight
+  ≥ `GRAPH_SIM_FLOOR` (0.5), stored canonically (`src < dst`) in the `edges`
+  table. The read side caps each node to its top-K=`GRAPH_TOP_K` (8) strongest
+  edges (union across both endpoints) and attaches degree, avoiding a hairball on
+  dense corpora. Cytoscape.js renders the graph client-side (fcose layout); nodes
+  are colored by type and sized by degree; clicking a node navigates to its detail
+  page; the type filter and search highlight are client-side. The graph is empty
+  (shows an empty-state message) when `ATLAS_EMBED_*` is unconfigured or the
+  corpus has not been embedded yet. A one-time `python -m aishelf.db sync
+  --rebuild` is required to backfill `edges` on an existing DB after upgrading.
 - **Note:** detail page prefills the saved note; saving POSTs to `/notes/{id}` →
   atomic write under `data/notes/`. Independent of the content record.
 - **Delete:** confirm → `POST /delete/{id}` → `items.delete_item` unlinks the
@@ -220,7 +234,7 @@ otherwise `403`. Browsing, notes, and delete are not gated.
 pip install -e ".[dev]"
 python -m aishelf.site        # Atlas site + scheduler, default :8001 (AISHELF_DATA_DIR=data)
 python -m aishelf.db sync     # backfill/refresh the derived DB (--rebuild to recreate)
-pytest                        # 246 tests; network tests deselected by default
+pytest                        # 264 tests; network tests deselected by default
 ```
 
 Hermes must be running (default `http://127.0.0.1:8642/v1`) for collection to
@@ -229,8 +243,9 @@ add a passcode to `config/collect_allowlist.txt` and enter it on the page. On a
 fresh deploy, run `python -m aishelf.db sync` once to backfill `/api/search`.
 Extra env: `AISHELF_COLLECT_ALLOWLIST`, `AISHELF_SCHEDULES`,
 `AISHELF_SCHEDULER_ENABLED` (launcher sets it; empty to disable), `AISHELF_DB_PATH`,
-`ATLAS_EMBED_BASE_URL`/`_API_KEY`/`_MODEL` (optional; enables hybrid `/ask` retrieval —
-run `python -m aishelf.db sync --rebuild` once after setting to backfill embeddings).
+`ATLAS_EMBED_BASE_URL`/`_API_KEY`/`_MODEL` (optional; enables hybrid `/ask` retrieval
+and the `/graph` knowledge graph — run `python -m aishelf.db sync --rebuild` once
+after setting to backfill embeddings and `edges`).
 
 ### Testing
 
@@ -287,4 +302,5 @@ Each piece has its own spec → plan in `docs/superpowers/`:
 | Schedules UI (in `/collect`) | 2026-06-05 |
 | Derived SQLite DB + FTS5 search | 2026-06-08 |
 | Hybrid retrieval (FTS5 + embeddings) | 2026-06-10 |
+| Knowledge graph | 2026-06-15 |
 | (superseded) Hermes WebUI, M1 scraper | 2026-06-02, 2026-05-28 |

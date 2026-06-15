@@ -41,6 +41,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   title, summary, keywords, author, note,
   tokenize='unicode61'
 );
+CREATE TABLE IF NOT EXISTS edges (
+  src    TEXT NOT NULL,
+  dst    TEXT NOT NULL,
+  weight REAL NOT NULL,
+  PRIMARY KEY (src, dst)
+);
 """
 
 
