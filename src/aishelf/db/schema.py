@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS items (
   embedding         BLOB,
   embedding_model   TEXT,
   embedding_dim     INTEGER,
+  alias             TEXT,
   content_hash  TEXT NOT NULL,
   synced_at     TEXT NOT NULL
 );

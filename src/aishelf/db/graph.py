@@ -9,6 +9,8 @@ Edges are recomputed incrementally at sync time.
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 
 from aishelf.db import schema, vector
@@ -49,6 +51,45 @@ def _canon(a: str, b: str) -> tuple[str, str]:
     return (a, b) if a < b else (b, a)
 
 
+def _hash_point(item_id: str) -> tuple[float, float, float]:
+    """Deterministic point uniformly on the unit sphere from an id (fallback
+    placement for nodes without a usable embedding)."""
+    h = hashlib.sha1(item_id.encode("utf-8")).digest()
+    u = int.from_bytes(h[0:4], "big") / 2 ** 32
+    v = int.from_bytes(h[4:8], "big") / 2 ** 32
+    z = 2.0 * u - 1.0
+    theta = 2.0 * np.pi * v
+    r = (1.0 - z * z) ** 0.5
+    return (float(r * np.cos(theta)), float(r * np.sin(theta)), float(z))
+
+
+def _sphere_positions(node_ids: list[str], groups: dict) -> dict[str, tuple[float, float, float]]:
+    """Unit-sphere position per node: PCA the largest embedding group to 3D and
+    L2-normalize each row; ids without an embedding (or when <3 are embedded, or
+    PCA is degenerate) get a deterministic hash point. Every node gets a position."""
+    pos: dict[str, tuple[float, float, float]] = {}
+    if groups:
+        dim = max(groups, key=lambda d: len(groups[d][0]))
+        ids, mat = groups[dim]
+        if len(ids) >= 3:
+            centered = mat - mat.mean(axis=0)
+            try:
+                _u, _s, vt = np.linalg.svd(centered, full_matrices=False)
+                coords = centered @ vt[:3].T
+                if coords.shape[1] < 3:
+                    coords = np.pad(coords, ((0, 0), (0, 3 - coords.shape[1])))
+                norms = np.linalg.norm(coords, axis=1)
+                for sid, row, nrm in zip(ids, coords, norms):
+                    if nrm > 1e-9:   # zero-norm row (degenerate) -> hash fallback below
+                        pos[sid] = (float(row[0] / nrm), float(row[1] / nrm), float(row[2] / nrm))
+            except np.linalg.LinAlgError:
+                pass
+    for sid in node_ids:
+        if sid not in pos:
+            pos[sid] = _hash_point(sid)
+    return pos
+
+
 def _load_groups(con) -> dict[int, tuple[list[str], np.ndarray]]:
     """All stored embeddings grouped by dimension: {dim: (ids, matrix)}.
 
@@ -76,14 +117,13 @@ def delete_edges_for(con, item_ids) -> None:
 
 
 def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
-    """Nodes (id/type/title/author + degree) and edges, capping each node to its
-    top-K strongest incident edges (an edge survives if it is in the top-K of
-    either endpoint). Degree counts the kept edges."""
+    """Nodes (id/type/title/alias/degree + unit-sphere x,y,z) and edges, capping each node to its top-K strongest incident edges (an edge survives if it is in the top-K of either endpoint). Degree counts the kept edges."""
     con = schema.connect(db_path)
     try:
         schema.init_db(con)
-        node_rows = con.execute("SELECT id, type, title, author FROM items").fetchall()
+        node_rows = con.execute("SELECT id, type, title, alias FROM items").fetchall()
         edge_rows = con.execute("SELECT src, dst, weight FROM edges").fetchall()
+        groups = _load_groups(con)
     finally:
         con.close()
 
@@ -112,11 +152,15 @@ def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
         degree[s] = degree.get(s, 0) + 1
         degree[d] = degree.get(d, 0) + 1
 
-    nodes = [
-        {"id": r["id"], "type": r["type"], "title": r["title"],
-         "author": r["author"], "degree": degree.get(r["id"], 0)}
-        for r in node_rows
-    ]
+    positions = _sphere_positions([r["id"] for r in node_rows], groups)
+    nodes = []
+    for r in node_rows:
+        x, y, z = positions[r["id"]]
+        nodes.append({
+            "id": r["id"], "type": r["type"], "title": r["title"],
+            "alias": r["alias"] or "", "degree": degree.get(r["id"], 0),
+            "x": x, "y": y, "z": z,
+        })
     return {"nodes": nodes, "edges": edges}
 
 
