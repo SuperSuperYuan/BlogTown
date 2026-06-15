@@ -621,16 +621,15 @@
 <style>
   /* Atlas top nav + full-screen /ask layout */
   body { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; min-height: 100vh; }
-  .atlas-topbar { flex: none; display: flex; align-items: center; gap: 18px; height: 56px; padding: 0 20px; background: #fff; border-bottom: 1px solid var(--line); box-shadow: 0 1px 3px rgba(31,71,140,.05); z-index: 10; }
-  .atlas-logo { font-family: var(--ff-hero); font-weight: 700; font-size: 22px; color: var(--accent-deep); text-decoration: none; letter-spacing: .01em; }
-  .atlas-nav { display: flex; gap: 4px; }
-  .atlas-nav a { font-size: var(--fs-14); color: var(--ink-2); text-decoration: none; padding: 7px 12px; border-radius: var(--r-full); transition: all var(--dur-fast) var(--ease-default); }
-  .atlas-nav a:hover { background: var(--accent-soft); color: var(--accent-deep); }
-  .atlas-nav a.active { background: var(--accent); color: #fff; }
-  .atlas-search { margin-left: auto; display: flex; gap: 8px; }
-  .atlas-search input { height: 36px; width: 240px; max-width: 38vw; border: 1px solid var(--line); border-radius: var(--r-lg); padding: 0 12px; font-family: var(--ff-cjk); font-size: var(--fs-13); color: var(--ink); background: var(--surface-2); outline: none; }
-  .atlas-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .atlas-search button { height: 36px; padding: 0 16px; border: none; border-radius: var(--r-lg); background: var(--accent); color: #fff; font-family: var(--ff-cjk); font-size: var(--fs-13); cursor: pointer; }
+  /* Match the shared base.html .topbar (dark) so /ask's nav is identical to every other page. */
+  .atlas-topbar { flex: none; display: flex; align-items: center; gap: 20px; padding: 12px 20px; background: #1f2933; color: #fff; }
+  .atlas-logo { font-weight: 700; font-size: 18px; color: #fff; text-decoration: none; }
+  .atlas-nav { display: flex; }
+  .atlas-nav a { margin-right: 14px; color: #cbd2d9; text-decoration: none; }
+  .atlas-nav a:hover { color: #fff; }
+  .atlas-search { margin-left: auto; display: flex; gap: 6px; }
+  .atlas-search input { padding: 7px 10px; border: none; border-radius: 8px; width: 240px; font-family: var(--ff-cjk); font-size: 14px; }
+  .atlas-search button { padding: 7px 14px; border: none; border-radius: 8px; background: #0a84ff; color: #fff; cursor: pointer; font-family: var(--ff-cjk); }
   .atlas-search button:hover { background: var(--accent-deep); }
   /* Expand the chat app to fill the viewport below the nav (was a 1240x760 card) */
   .app { max-width: none; width: 100%; height: auto; flex: 1; min-height: 0; border: none; border-radius: 0; box-shadow: none; }
@@ -649,7 +648,8 @@
     <nav class="atlas-nav">
       <a href="/videos">视频</a>
       <a href="/blogs">博客</a>
-      <a href="/ask" class="active">问答</a>
+      <a href="/ask">问答</a>
+      <a href="/graph">图谱</a>
       <a href="/collect">Hermes</a>
     </nav>
     <form class="atlas-search" action="/search" method="get">
