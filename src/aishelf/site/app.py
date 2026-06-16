@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, Form, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -29,7 +29,9 @@ from aishelf.site import (
     hermes,
     items,
     llm,
+    markdown,
     notes,
+    posts,
     schedule_state,
     scheduler,
     schedules,
@@ -189,11 +191,72 @@ def blog_detail(request: Request, item_id: str):
     item = next((it for it in views.blogs(_items()) if it.id == item_id), None)
     if item is None:
         raise HTTPException(status_code=404)
+    body_html = (
+        markdown.render_markdown(item.body or "")
+        if getattr(item, "origin", "collected") == "self"
+        else None
+    )
     return templates.TemplateResponse(
         request,
         "blog_detail.html",
-        {"item": item, "section_url": "/blogs", "note": _note_for(item)},
+        {"item": item, "section_url": "/blogs", "note": _note_for(item),
+         "body_html": body_html},
     )
+
+
+@app.get("/write", response_class=HTMLResponse)
+def write_new_page(request: Request):
+    return templates.TemplateResponse(request, "write.html", {"item": None})
+
+
+@app.get("/write/{item_id}", response_class=HTMLResponse)
+def write_edit_page(request: Request, item_id: str):
+    item = posts.read_post(item_id)
+    if item is None:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(request, "write.html", {"item": item})
+
+
+@app.post("/posts")
+def create_post_route(request: Request, title: str = Form(""), body: str = Form("")):
+    if not title.strip() or not body.strip():
+        return templates.TemplateResponse(
+            request, "write.html",
+            {"item": None, "error": "标题和正文都不能为空", "title": title, "body": body},
+            status_code=400,
+        )
+    item = posts.create_post(title.strip(), body)
+    _sync_db_async(get_data_dir())  # make it searchable / graphed off-thread
+    return RedirectResponse(f"/blogs/{item.id}", status_code=303)
+
+
+class _PreviewRequest(BaseModel):
+    body: str = Field(default="", max_length=200_000)
+
+
+@app.post("/posts/preview")
+def preview_post(req: _PreviewRequest):
+    # Same server-side renderer as the published page → byte-identical preview.
+    return {"html": markdown.render_markdown(req.body)}
+
+
+@app.post("/posts/{item_id}")
+def update_post_route(request: Request, item_id: str, title: str = Form(""), body: str = Form("")):
+    if not title.strip() or not body.strip():
+        existing = posts.read_post(item_id)
+        if existing is None:
+            raise HTTPException(status_code=404)
+        return templates.TemplateResponse(
+            request, "write.html",
+            {"item": existing, "error": "标题和正文都不能为空", "title": title, "body": body},
+            status_code=400,
+        )
+    try:
+        item = posts.update_post(item_id, title.strip(), body)
+    except LookupError:
+        raise HTTPException(status_code=404)
+    _sync_db_async(get_data_dir())
+    return RedirectResponse(f"/blogs/{item.id}", status_code=303)
 
 
 @app.get("/authors/{key}", response_class=HTMLResponse)

@@ -166,3 +166,11 @@ main:has(.hermes) { max-width: none; padding: 10px 14px; }
 .collect-guide { margin: 6px 0 14px 52px; display: flex; align-items: center; gap: 10px; }
 .jump-btn, .collect-btn { font-size: 13px; color: #fff; background: #0a84ff; padding: 4px 10px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
 .jump-btn:hover, .collect-btn:hover { opacity: .9; }
+.badge-origin { font-size: .7em; background: #2563eb; color: #fff; border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
+.write-form { display: flex; flex-direction: column; gap: 12px; }
+.write-title { font-size: 1.2em; padding: 8px; }
+.write-split { display: flex; gap: 16px; align-items: stretch; }
+.write-body, .write-preview { flex: 1; min-height: 60vh; }
+.write-body { padding: 10px; font-family: ui-monospace, monospace; resize: vertical; }
+.write-preview { padding: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: auto; }
+.post-body img { max-width: 100%; }

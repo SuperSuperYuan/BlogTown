@@ -58,7 +58,11 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `is_low_confidence` for the empty→collect guide — fires when `retrieve` returns
   nothing, since `retrieve` already owns the relevance gate), `llm.py` (chat-model
   client, `ATLAS_CHAT_*`, `stream_completion`), `notes.py` (per-item notes),
-  `items.py` (`safe_id` + `delete_item`), `allowlist.py` (collect passcode gate),
+  `items.py` (`safe_id` + `delete_item`), `markdown.py` (render user markdown →
+  sanitized HTML via markdown-it-py + nh3; never raises), `posts.py`
+  (`create_post`/`read_post`/`update_post` for self-authored blogs; atomic writes
+  like `notes.py`; pure persistence — route triggers the DB re-sync),
+  `allowlist.py` (collect passcode gate),
   `schedules.py` (config load + pure `due_schedules`), `schedule_state.py`
   (last-run dates), `scheduler.py` (background `run_due_now` loop), `templates/`,
   `static/`, `__main__.py`.
@@ -99,6 +103,9 @@ Source layout uses a `src/` directory; package is `aishelf`.
 
 - `data/videos/<id>.json`, `data/blogs/<id>.json` — content records (metadata +
   links only). `data/notes/<id>.json` — user notes (kept separate from records).
+  A blog record may be self-authored (`origin="self"`, markdown `body` field,
+  written by `posts.py`, rendered inline on the detail page); collected blogs
+  (`origin="collected"`, the default) are unchanged.
 - `id` = `<platform>-<native_id>` (or `blog-<sha1(url)[:12]>`); filename stem
   equals the `id` field.
 - **Atomic writes** (`.tmp` + rename) and **id sanitization** (`items.safe_id`,
@@ -155,6 +162,8 @@ configured) for hybrid `/ask` retrieval, backfill the `edges` table and
 - `AISHELF_SCHEDULER_ENABLED` — `__main__.py` sets it to `1` so the scheduler
   runs alongside the site; set it empty to disable. The test client never sets
   it, so `TestClient` spins up no background thread.
+- `ATLAS_BLOG_AUTHOR` — default author name stamped on self-authored posts
+  (default `我`).
 
 **Collect access control** (`aishelf.site.allowlist`): `POST /collect/chat` is
 gated by a hand-maintained passcode allowlist so only approved callers can spend

@@ -15,7 +15,7 @@ Three logical pieces (full write-up in [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 | Piece | Role |
 |---|---|
 | **Contract** (`aishelf.contract`) | Pydantic models + loader + JSON Schema for the two content modalities — the seam between collection and display. |
-| **Site** (`aishelf.site`) | FastAPI + Jinja2 server-rendered app: browse (videos / blogs / search / author), the Hermes collection chat, ask-your-library Q&A, a 3D knowledge graph, per-item notes, and delete. |
+| **Site** (`aishelf.site`) | FastAPI + Jinja2 server-rendered app: browse (videos / blogs / search / author), the Hermes collection chat, ask-your-library Q&A, a 3D knowledge graph, per-item notes, delete, and a **写博客** editor for self-authored markdown posts. |
 | **Hermes** (external) | Crawls sources and writes `data/{videos,blogs}/<id>.json` directly, instructed by a system prompt that embeds the JSON Schema. |
 
 Data lives on disk under `data/` (gitignored): `data/videos/<id>.json`,
@@ -109,6 +109,7 @@ with `AISHELF_SCHEDULES=...`.
 | `AISHELF_COLLECT_ALLOWLIST` | `config/collect_allowlist.txt` | Collect passcode allowlist |
 | `AISHELF_SCHEDULES` | `config/schedules.yaml` | Timed-collection config |
 | `AISHELF_SCHEDULER_ENABLED` | `1` (set by launcher) | Run the scheduler; empty to disable |
+| `ATLAS_BLOG_AUTHOR` | `我` | Default author name on self-authored blog posts (`/write`) |
 | `HERMES_BASE_URL` / `HERMES_API_KEY` / `HERMES_MODEL` | `http://127.0.0.1:8642/v1` / — / `hermes-agent` | Hermes connection |
 
 ### LAN access
