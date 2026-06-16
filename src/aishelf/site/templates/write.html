@@ -1,17 +1,29 @@
 {% extends "base.html" %}
 {% block title %}{% if item %}编辑{% else %}写博客{% endif %} · Atlas{% endblock %}
 {% block content %}
-<h1>{% if item %}编辑文章{% else %}写新文章{% endif %}</h1>
-{% if error %}<p class="note-status err">{{ error }}</p>{% endif %}
-<form class="write-form" method="post" action="{% if item %}/posts/{{ item.id }}{% else %}/posts{% endif %}">
-  <input class="write-title" name="title" placeholder="标题"
-         value="{{ title if title is defined else (item.title if item else '') }}" />
-  <div class="write-split">
-    <textarea id="md-body" class="write-body" name="body"
-              placeholder="用 markdown 写正文…">{{ body if body is defined else (item.body if item else '') }}</textarea>
-    <div id="md-preview" class="post-body write-preview"></div>
+<form class="write" method="post" action="{% if item %}/posts/{{ item.id }}{% else %}/posts{% endif %}">
+  <div class="write-head">
+    <h1>{% if item %}编辑文章{% else %}写新文章{% endif %}</h1>
+    <div class="write-actions">
+      {% if error %}<span class="write-err">{{ error }}</span>{% endif %}
+      <a class="ghost" href="{% if item %}/blogs/{{ item.id }}{% else %}/blogs{% endif %}">取消</a>
+      <button class="btn primary" type="submit">发布</button>
+    </div>
   </div>
-  <button class="btn" type="submit">发布</button>
+  <input class="write-title" name="title" placeholder="标题"
+         value="{{ title if title is defined else (item.title if item else '') }}"
+         {% if not item %}autofocus{% endif %} />
+  <div class="write-split">
+    <div class="write-pane">
+      <div class="write-pane-label">Markdown</div>
+      <textarea id="md-body" class="write-body" name="body"
+                placeholder="用 markdown 写正文…">{{ body if body is defined else (item.body if item else '') }}</textarea>
+    </div>
+    <div class="write-pane">
+      <div class="write-pane-label">预览</div>
+      <div id="md-preview" class="post-body write-preview"></div>
+    </div>
+  </div>
 </form>
 <script>
 (function () {
