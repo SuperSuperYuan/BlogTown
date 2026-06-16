@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 from urllib.parse import quote
 
@@ -152,3 +153,37 @@ def test_detail_renders_for_record_with_unsafe_id(tmp_path, monkeypatch):
     r = TestClient(app).get("/videos/" + quote("bad id"))
     assert r.status_code == 200  # renders with an empty note, not a 500
     assert "Bad Id" in r.text
+
+
+@pytest.fixture
+def rw_client(monkeypatch, tmp_path):
+    data = tmp_path / "data"
+    shutil.copytree(FIXTURES, data)
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(data))
+    monkeypatch.setenv("ATLAS_BLOG_AUTHOR", "我")
+    from aishelf.site.app import app
+    return TestClient(app)
+
+
+def test_self_post_appears_in_blogs_list_with_badge(rw_client):
+    rw_client.post("/posts", data={"title": "我的原创长文", "body": "正文内容"},
+                   follow_redirects=False)
+    r = rw_client.get("/blogs")
+    assert r.status_code == 200
+    assert "我的原创长文" in r.text   # mixed with collected blogs
+    assert "原创" in r.text          # badge present
+    assert "May post" in r.text       # collected blogs still listed
+
+
+def test_self_post_is_searchable_after_create(rw_client):
+    # creating a post triggers an off-thread sync; force a synchronous sync so
+    # the assertion is deterministic in the test (no sleeping on a daemon thread)
+    from aishelf.db import sync as db_sync
+    from aishelf.db.config import default_db_path
+    import os
+    data_dir = os.environ["AISHELF_DATA_DIR"]
+    rw_client.post("/posts", data={"title": "可检索原创", "body": "独特关键词xyzzy"},
+                   follow_redirects=False)
+    db_sync.sync(data_dir, default_db_path(data_dir))
+    r = rw_client.get("/api/search", params={"q": "可检索原创"})
+    assert any("可检索原创" in hit["title"] for hit in r.json()["results"])
