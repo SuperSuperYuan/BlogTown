@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
@@ -19,6 +20,8 @@ from pathlib import Path
 from aishelf.contract.models import BlogItem
 from aishelf.site.config import blog_author, get_data_dir
 from aishelf.site.items import safe_id
+
+logger = logging.getLogger(__name__)
 
 SUMMARY_LEN = 120
 
@@ -96,7 +99,10 @@ def read_post(item_id: str) -> BlogItem | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         item = BlogItem(**data)
-    except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError, TypeError):
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, OSError, ValueError, TypeError) as exc:
+        logger.warning("unreadable post %s: %s", path, exc)
         return None
     return item if item.origin == "self" else None
 

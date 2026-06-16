@@ -39,7 +39,7 @@ def test_summary_is_auto_extracted_from_body(data_dir):
     item = posts.create_post("t", "# 大标题\n\n**重点**内容在这里，更多文字跟随其后。")
     assert "大标题" in item.summary or "重点" in item.summary
     assert "#" not in item.summary and "*" not in item.summary
-    assert len(item.summary) <= 121  # ~120 char cap
+    assert len(item.summary) <= 120  # SUMMARY_LEN cap
 
 
 def test_create_post_id_is_path_safe_and_stable_per_clock(data_dir):
