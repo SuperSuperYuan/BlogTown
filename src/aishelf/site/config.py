@@ -9,3 +9,8 @@ from pathlib import Path
 def get_data_dir() -> Path:
     """Directory holding `videos/` and `blogs/` record files."""
     return Path(os.environ.get("AISHELF_DATA_DIR", "data"))
+
+
+def blog_author() -> str:
+    """Default author name stamped on self-authored posts."""
+    return os.environ.get("ATLAS_BLOG_AUTHOR", "我")
