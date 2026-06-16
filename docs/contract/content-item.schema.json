@@ -82,6 +82,27 @@
           ],
           "default": null,
           "title": "Author Id"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Body"
+        },
+        "origin": {
+          "default": "collected",
+          "enum": [
+            "collected",
+            "self"
+          ],
+          "title": "Origin",
+          "type": "string"
         }
       },
       "required": [

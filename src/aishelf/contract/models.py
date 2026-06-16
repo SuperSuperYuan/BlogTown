@@ -41,6 +41,8 @@ class BlogItem(ContentItem):
     cover_image_url: str | None = None
     site_name: str | None = None
     author_id: str | None = None
+    body: str | None = None                       # markdown source; self-authored only
+    origin: Literal["collected", "self"] = "collected"
 
 
 AnyContentItem = Annotated[Union[VideoItem, BlogItem], Field(discriminator="type")]

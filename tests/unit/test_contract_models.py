@@ -87,3 +87,22 @@ def test_unknown_type_raises():
     bad["type"] = "podcast"
     with pytest.raises(ValidationError):
         parse_item(bad)
+
+
+def test_blog_defaults_origin_collected_and_body_none():
+    item = parse_item(BLOG)  # BLOG fixture has neither field
+    assert isinstance(item, BlogItem)
+    assert item.origin == "collected"
+    assert item.body is None
+
+
+def test_blog_accepts_self_origin_and_body():
+    raw = {**BLOG, "origin": "self", "body": "# Hello\n\nworld"}
+    item = parse_item(raw)
+    assert item.origin == "self"
+    assert item.body == "# Hello\n\nworld"
+
+
+def test_blog_rejects_unknown_origin():
+    with pytest.raises(ValidationError):
+        parse_item({**BLOG, "origin": "draft"})
