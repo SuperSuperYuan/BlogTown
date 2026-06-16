@@ -16,7 +16,7 @@ from markdown_it import MarkdownIt
 
 logger = logging.getLogger(__name__)
 
-_MD = MarkdownIt("commonmark", {"linkify": True})
+_MD = MarkdownIt("commonmark")
 
 
 def _render(text: str) -> str:

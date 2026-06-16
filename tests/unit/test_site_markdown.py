@@ -10,7 +10,7 @@ def test_renders_basic_markdown():
 def test_strips_script_tags():
     html = render_markdown("hi\n\n<script>alert(1)</script>")
     assert "<script" not in html
-    assert "alert(1)" not in html or "<script" not in html  # script element gone
+    assert "alert(1)" not in html
 
 
 def test_strips_inline_event_handlers_and_js_urls():
