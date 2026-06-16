@@ -2,11 +2,18 @@
 {% block title %}{{ item.title }} · Atlas{% endblock %}
 {% block content %}
 <article class="detail">
+  {% if item.origin == "self" %}
+  <h1>{{ item.title }} <span class="badge-origin">原创</span></h1>
+  <div class="sub"><a href="/authors/{{ (item.author_id or item.author)|urlencode }}">{{ item.author }}</a> · {{ item.published_at[:10] }}</div>
+  <p><a class="btn" href="/write/{{ item.id }}">编辑 →</a></p>
+  <div class="post-body">{{ body_html|safe }}</div>
+  {% else %}
   {% if item.cover_image_url %}<img class="cover-lg" src="{{ item.cover_image_url|safe_url }}" alt="" />{% endif %}
   <h1>{{ item.title }}</h1>
   <div class="sub"><a href="/authors/{{ (item.author_id or item.author)|urlencode }}">{{ item.author }}</a> · {{ item.published_at[:10] }}{% if item.site_name %} · {{ item.site_name }}{% endif %}</div>
   <p class="summary">{{ item.summary }}</p>
   <p><a class="btn" href="{{ item.source_url|safe_url }}" target="_blank" rel="noopener noreferrer">阅读全文(原站) →</a></p>
+  {% endif %}
   {% include "_keywords.html" %}
   {% include "_note_editor.html" %}
   {% include "_delete_button.html" %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{% if item %}编辑{% else %}写博客{% endif %} · Atlas{% endblock %}
+{% block content %}
+<h1>{% if item %}编辑文章{% else %}写新文章{% endif %}</h1>
+{% if error %}<p class="note-status err">{{ error }}</p>{% endif %}
+<form class="write-form" method="post" action="{% if item %}/posts/{{ item.id }}{% else %}/posts{% endif %}">
+  <input class="write-title" name="title" placeholder="标题"
+         value="{{ title if title is defined else (item.title if item else '') }}" />
+  <div class="write-split">
+    <textarea id="md-body" class="write-body" name="body"
+              placeholder="用 markdown 写正文…">{{ body if body is defined else (item.body if item else '') }}</textarea>
+    <div id="md-preview" class="post-body write-preview"></div>
+  </div>
+  <button class="btn" type="submit">发布</button>
+</form>
+<script>
+(function () {
+  const ta = document.getElementById("md-body");
+  const preview = document.getElementById("md-preview");
+  let timer = null;
+  async function render() {
+    try {
+      const r = await fetch("/posts/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: ta.value }),
+      });
+      const data = await r.json();
+      preview.innerHTML = data.html;  // server-sanitized HTML
+    } catch (e) { /* preview is best-effort */ }
+  }
+  ta.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(render, 250);  // debounce
+  });
+  render();  // initial paint (prefilled edit)
+})();
+</script>
+{% endblock %}
