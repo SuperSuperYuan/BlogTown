@@ -25,6 +25,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: ta.value }),
       });
+      if (!r.ok) return;  // on a validation error response, leave preview as-is
       const data = await r.json();
       preview.innerHTML = data.html;  // server-sanitized HTML
     } catch (e) { /* preview is best-effort */ }
