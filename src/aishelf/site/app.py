@@ -225,10 +225,12 @@ def video_detail(request: Request, item_id: str):
     item = next((it for it in views.videos(_items()) if it.id == item_id), None)
     if item is None:
         raise HTTPException(status_code=404)
+    note = _note_for(item)
     return templates.TemplateResponse(
         request,
         "video_detail.html",
-        {"item": item, "section_url": "/videos", "note": _note_for(item)},
+        {"item": item, "section_url": "/videos", "note": note,
+         "note_html": markdown.render_markdown(note)},
     )
 
 
@@ -242,11 +244,12 @@ def blog_detail(request: Request, item_id: str):
         if getattr(item, "origin", "collected") == "self"
         else None
     )
+    note = _note_for(item)
     return templates.TemplateResponse(
         request,
         "blog_detail.html",
-        {"item": item, "section_url": "/blogs", "note": _note_for(item),
-         "body_html": body_html},
+        {"item": item, "section_url": "/blogs", "note": note,
+         "note_html": markdown.render_markdown(note), "body_html": body_html},
     )
 
 
@@ -529,7 +532,7 @@ def save_note_route(item_id: str, req: _NoteRequest):
         raise HTTPException(status_code=400, detail="invalid note id")
     # The note text feeds search; refresh the derived index off-thread.
     _sync_db_async(get_data_dir())
-    return {"ok": True, "updated_at": updated_at}
+    return {"ok": True, "updated_at": updated_at, "html": markdown.render_markdown(req.text)}
 
 
 @app.post("/delete/{item_id}")
