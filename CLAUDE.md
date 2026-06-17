@@ -47,9 +47,14 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/alias.py` (package root) — LLM short-alias client reading
   `ATLAS_CHAT_*` (same model as `/ask`): `is_configured`, `generate_aliases(pairs)`
   — batched, returns `None` when unconfigured, empty, error, or parse-mismatch
-  (caller falls back to truncated title). Lives at package root so `db` can use
-  it without importing `site` (same pattern as `embed.py`).
-- `aishelf/site/` — `app.py` (routes + scheduler lifespan), `views.py` (pure
+  (caller falls back to truncated title); also `generate_hooks(pairs)` — same
+  batched LLM core, same `ATLAS_CHAT_*` gate, same None-on-failure degradation —
+  returns a one-sentence ≤30-char Chinese "为什么值得看" hook per item for browse
+  lists. Lives at package root so `db` can use it without importing `site` (same
+  pattern as `embed.py`).
+- `aishelf/site/` — `app.py` (routes + scheduler lifespan; browse/home/author
+  routes surface per-item hooks via a `_hooks_for` helper that bridges
+  `db_search.hooks_for` into the file-rendered lists), `views.py` (pure
   filter/search/paginate), `hermes.py` (Hermes connection + robust SSE
   `stream_chat`), `collect.py` (system-prompt builder + non-streaming
   `run_once`), `ask.py` (RAG core for `/ask`: `retrieve` — hybrid vector + FTS5
@@ -69,7 +74,7 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
   `connect`/`init_db`; the `items` table now includes `embedding BLOB`,
-  `embedding_model TEXT`, `embedding_dim INTEGER`, and `alias TEXT` — all
+  `embedding_model TEXT`, `embedding_dim INTEGER`, `alias TEXT`, and `hook TEXT` — all
   nullable, backfilled by `sync --rebuild`), `tokenize.py` (CJK bigram
   `bigrams`/`to_match_query`),
   `sync.py` (idempotent `sync` — upsert + prune; when `ATLAS_EMBED_*` is
@@ -79,13 +84,16 @@ Source layout uses a `src/` directory; package is `aishelf`.
   ids and deleting edges of pruned items, all in the same transaction; when
   `alias.is_configured()`, also generates and stores a short Chinese node alias
   for new items and items whose title changed (and backfills any missing alias);
-  note edits do NOT regenerate aliases; all in the same transaction; empty
-  graph when embeddings are unconfigured; embedding/alias failure leaves rows
+  note edits do NOT regenerate aliases; on the same title-keyed policy also
+  generates and stores a per-item `hook` (new item / title change / missing;
+  note edits do NOT regenerate it); all in the same transaction; empty
+  graph when embeddings are unconfigured; embedding/alias/hook failure leaves rows
   intact without crashing), `vector.py`
   (float32 BLOB `pack`/`unpack`, `load_embeddings`, and brute-force numpy
   `cosine_search` — no vector index, exhaustive cosine over the corpus),
   `search.py` (`search` over FTS5; `get_by_ids` hydrates items by id into a
-  `{id: SearchHit}` map), `graph.py` (semantic knowledge graph: `neighbors`
+  `{id: SearchHit}` map; `hooks_for(db_path, ids)` → `{id: hook}` map — omits
+  empty/missing entries; tolerant of a missing/old DB, returning `{}`), `graph.py` (semantic knowledge graph: `neighbors`
   cosine ≥ `GRAPH_SIM_FLOOR`; `recompute_edges_for`/`delete_edges_for` for
   incremental edge maintenance; `load_graph` reads nodes + edges with per-node
   top-K=`GRAPH_TOP_K` cap and returns each node with `alias` (or `""` → frontend
@@ -128,8 +136,9 @@ drag-rotate + scroll-zoom + auto-rotate; hover, click, type filter, search
 highlight); `GET /api/graph` serves the raw `{nodes, edges}` JSON. Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
 columns including `note`, backfill embeddings (when `ATLAS_EMBED_*` is
-configured) for hybrid `/ask` retrieval, backfill the `edges` table and
-`alias` column for `/graph` (no startup/periodic sync by design).
+configured) for hybrid `/ask` retrieval, backfill the `edges` table,
+`alias` column for `/graph`, and `hook` column for browse lists
+(no startup/periodic sync by design).
 
 **Key conventions**
 
