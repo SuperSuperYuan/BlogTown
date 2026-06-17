@@ -432,3 +432,80 @@ def test_sync_backfills_missing_hook_without_title_change(tmp_path, monkeypatch)
     monkeypatch.setattr(_alias, "generate_hooks", lambda pairs: ["补的钩子"] * len(pairs))
     sync(data, db)
     assert _hook_of(db, "v1") == "补的钩子"
+
+
+# ---------------------------------------------------------------------------
+# Cluster tests (主题星系)
+# ---------------------------------------------------------------------------
+
+def _cluster_of(db_path, vid):
+    con = schema.connect(db_path)
+    row = con.execute("SELECT cluster FROM items WHERE id=?", (vid,)).fetchone()
+    con.close()
+    return row["cluster"]
+
+
+def test_sync_clusters_items_when_embeddings_configured(tmp_path, monkeypatch):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0], [0.97, 0.2]][: len(texts)])
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)   # isolate clustering from naming
+    sync(data, db)
+    assert _cluster_of(db, "v1") is not None
+    con = schema.connect(db)
+    assert con.execute("SELECT count(*) FROM clusters").fetchone()[0] >= 1
+    con.close()
+
+
+def test_sync_no_clusters_when_embeddings_unconfigured(tmp_path, monkeypatch):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write_video(data, "v1")
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)
+    sync(data, db)
+    assert _cluster_of(db, "v1") is None
+    con = schema.connect(db)
+    assert con.execute("SELECT count(*) FROM clusters").fetchone()[0] == 0
+    con.close()
+
+
+def test_sync_names_clusters_when_alias_configured(tmp_path, monkeypatch):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0], [0.97, 0.2]][: len(texts)])
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)
+    monkeypatch.setattr(_alias, "generate_hooks", lambda pairs: None)
+    monkeypatch.setattr(_alias, "generate_cluster_names", lambda clusters: ["星系名"] * len(clusters))
+    sync(data, db)
+    con = schema.connect(db)
+    names = [r["name"] for r in con.execute("SELECT name FROM clusters")]
+    con.close()
+    assert names and all(n == "星系名" for n in names)
+
+
+def test_sync_note_edit_does_not_rename_clusters(tmp_path, monkeypatch):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0], [0.97, 0.2]][: len(texts)])
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)
+    monkeypatch.setattr(_alias, "generate_hooks", lambda pairs: None)
+    calls = {"n": 0}
+
+    def _name(clusters):
+        calls["n"] += 1
+        return ["星系名"] * len(clusters)
+
+    monkeypatch.setattr(_alias, "generate_cluster_names", _name)
+    sync(data, db)
+    assert calls["n"] == 1
+    _write_note(data, "v1", "新增一段笔记")
+    sync(data, db)
+    assert calls["n"] == 1
