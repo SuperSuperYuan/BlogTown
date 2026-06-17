@@ -76,6 +76,9 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `build_messages`; surfaced by `GET /collide` + `POST /collide/chat`, which
   emits the chosen pair then streams a three-part 中文 synthesis via
   `llm.stream_completion`; on-demand, no persistence, reuses `ATLAS_CHAT_*`/`ATLAS_EMBED_*`),
+  `digest.py` (今日速读: pure `build_digest` — recent items sorted by `collected_at` + one
+  date-seeded older "gem" via `random.Random(today)`, each carrying its A-hook; no LLM/cache;
+  rendered as a 今日速读 card at the top of `GET /`),
   `templates/`, `static/`, `__main__.py`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
