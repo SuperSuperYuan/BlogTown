@@ -247,3 +247,8 @@ main:has(.write) { max-width: 1280px; }
   .home-layout { flex-direction: column; }
   .digest { flex-basis: auto; width: 100%; position: static; order: -1; }
 }
+.notes-head { display: flex; align-items: baseline; justify-content: space-between; }
+.note-view { margin: 6px 0 4px; }
+.note-view:empty { display: none; }
+.btn-link { background: none; border: none; color: #0a84ff; cursor: pointer; font-size: 13px; padding: 0; }
+.btn-link:hover { text-decoration: underline; }

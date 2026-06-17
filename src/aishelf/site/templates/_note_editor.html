@@ -1,18 +1,33 @@
 <section class="notes">
-  <h2>我的笔记</h2>
-  <textarea id="note" class="note-input" placeholder="写点笔记…">{{ note }}</textarea>
-  <div class="note-bar">
-    <button id="note-save" type="button" class="btn">保存笔记</button>
-    <span id="note-status" class="note-status"></span>
+  <div class="notes-head">
+    <h2>我的笔记</h2>
+    <button id="note-edit-btn" type="button" class="btn-link"{% if not note %} hidden{% endif %}>编辑</button>
+  </div>
+  <div id="note-view" class="note-view post-body"{% if not note %} hidden{% endif %}>{{ note_html | safe }}</div>
+  <div id="note-edit"{% if note %} hidden{% endif %}>
+    <textarea id="note" class="note-input" placeholder="写点笔记…（支持 Markdown）">{{ note }}</textarea>
+    <div class="note-bar">
+      <button id="note-save" type="button" class="btn">保存笔记</button>
+      <span id="note-status" class="note-status"></span>
+    </div>
   </div>
 </section>
 <script>
 (function () {
+  const view = document.getElementById("note-view");
+  const edit = document.getElementById("note-edit");
+  const editBtn = document.getElementById("note-edit-btn");
   const ta = document.getElementById("note");
-  const btn = document.getElementById("note-save");
+  const saveBtn = document.getElementById("note-save");
   const status = document.getElementById("note-status");
-  btn.addEventListener("click", async () => {
-    btn.disabled = true;
+
+  function showEdit() { view.hidden = true; editBtn.hidden = true; edit.hidden = false; ta.focus(); }
+  function showView() { edit.hidden = true; view.hidden = false; editBtn.hidden = false; }
+
+  editBtn.addEventListener("click", showEdit);
+
+  saveBtn.addEventListener("click", async () => {
+    saveBtn.disabled = true;
     status.className = "note-status";
     status.textContent = "保存中…";
     try {
@@ -22,12 +37,14 @@
         body: JSON.stringify({ text: ta.value }),
       });
       if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
       status.textContent = "已保存 ✓";
+      if (ta.value.trim()) { view.innerHTML = data.html; showView(); }
     } catch (e) {
       status.className = "note-status err";
       status.textContent = "保存失败：" + e;
     } finally {
-      btn.disabled = false;
+      saveBtn.disabled = false;
     }
   });
 })();

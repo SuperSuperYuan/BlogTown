@@ -84,3 +84,19 @@ def test_save_empty_note_returns_blank_html(client):
     r = client.post("/notes/youtube-aaa", json={"text": ""})
     assert r.status_code == 200
     assert r.json()["html"] == ""
+
+
+def test_detail_renders_note_as_markdown(client):
+    client.post("/notes/youtube-aaa", json={"text": "**加粗笔记**"})
+    r = client.get("/videos/youtube-aaa")
+    assert r.status_code == 200
+    assert "<strong>加粗笔记</strong>" in r.text   # rendered in the view block
+    assert 'id="note-view"' in r.text
+    assert 'id="note-edit-btn"' in r.text
+
+
+def test_detail_without_note_shows_editor(client):
+    r = client.get("/videos/youtube-aaa")            # no note saved yet
+    assert r.status_code == 200
+    assert 'id="note"' in r.text                     # textarea present
+    assert 'id="note-view" class="note-view post-body" hidden' in r.text  # view hidden
