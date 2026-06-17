@@ -2,6 +2,7 @@
  * standalone ask.html via the _topbar.html partial. Single source of truth
  * for the nav markup (_topbar.html) + styling (this file). */
 .topbar { display: flex; align-items: center; gap: 20px; padding: 12px 20px; background: #1f2933; color: #fff; position: sticky; top: 0; z-index: 10; }
+.topbar a { text-decoration: none; }
 .topbar .brand { font-weight: 700; font-size: 18px; color: #fff; }
 .topbar nav a { margin-right: 14px; color: #cbd2d9; }
 .topbar nav a:hover { color: #fff; }
