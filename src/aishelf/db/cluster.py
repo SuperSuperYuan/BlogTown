@@ -34,3 +34,38 @@ def choose_k(n: int) -> int:
 
 def color_for(cluster_id: int) -> str:
     return PALETTE[cluster_id % len(PALETTE)]
+
+
+def _normalize(mat: np.ndarray) -> np.ndarray:
+    norms = np.linalg.norm(mat, axis=1, keepdims=True)
+    return mat / (norms + 1e-12)
+
+
+def kmeans(matrix, k: int, *, seed: int, iters: int = 50):
+    """Lloyd's k-means on L2-normalized rows (== cosine clustering). Deterministic
+    for a given seed. Returns one int label per row. k is clamped to [1, n]."""
+    mat = np.asarray(matrix, dtype=np.float32)
+    n = mat.shape[0]
+    if n == 0:
+        return np.empty((0,), dtype=int)
+    k = max(1, min(k, n))
+    if k == 1:
+        return np.zeros(n, dtype=int)
+    x = _normalize(mat)
+    rng = np.random.default_rng(seed)
+    centroids = x[rng.choice(n, size=k, replace=False)].copy()
+    labels = np.full(n, -1, dtype=int)
+    for _ in range(iters):
+        new_labels = np.argmax(x @ centroids.T, axis=1)
+        if np.array_equal(new_labels, labels):
+            break
+        labels = new_labels
+        for c in range(k):
+            members = x[labels == c]
+            if len(members):
+                v = members.mean(axis=0)
+                nv = float(np.linalg.norm(v))
+                centroids[c] = v / nv if nv > 1e-12 else x[rng.integers(n)]
+            else:
+                centroids[c] = x[rng.integers(n)]
+    return labels
