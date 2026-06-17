@@ -91,6 +91,17 @@ def _note_for(item) -> str:
         return ""
 
 
+def _hooks_for(items):
+    """Map {id: hook} for the given items, tolerating a missing/locked derived
+    DB (the hook is a derived nicety — never break a page render)."""
+    try:
+        return db_search.hooks_for(
+            default_db_path(get_data_dir()), [it.id for it in items]
+        )
+    except Exception:  # derived view; never fatal
+        return {}
+
+
 templates.env.filters["duration"] = _fmt_duration
 templates.env.filters["safe_url"] = _safe_url
 
@@ -132,13 +143,12 @@ async def not_found_handler(request: Request, exc):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     items = _items()
+    vids = views.videos(items)[:HOME_PREVIEW]
+    blogs = views.blogs(items)[:HOME_PREVIEW]
     return templates.TemplateResponse(
         request,
         "home.html",
-        {
-            "videos": views.videos(items)[:HOME_PREVIEW],
-            "blogs": views.blogs(items)[:HOME_PREVIEW],
-        },
+        {"videos": vids, "blogs": blogs, "hooks": _hooks_for(vids + blogs)},
     )
 
 
@@ -151,10 +161,11 @@ def videos_page(request: Request, page: int = 1, keyword: str = "", q: str = "")
         result = views.by_keyword(views.videos(items), keyword)
     else:
         result = views.videos(items)
+    page_obj = views.paginate(result, page, VIDEOS_PER_PAGE)
     return templates.TemplateResponse(
         request,
         "videos.html",
-        {"page": views.paginate(result, page, VIDEOS_PER_PAGE), "keyword": keyword, "q": q},
+        {"page": page_obj, "keyword": keyword, "q": q, "hooks": _hooks_for(page_obj.items)},
     )
 
 
@@ -167,10 +178,11 @@ def blogs_page(request: Request, page: int = 1, keyword: str = "", q: str = ""):
         result = views.by_keyword(views.blogs(items), keyword)
     else:
         result = views.blogs(items)
+    page_obj = views.paginate(result, page, BLOGS_PER_PAGE)
     return templates.TemplateResponse(
         request,
         "blogs.html",
-        {"page": views.paginate(result, page, BLOGS_PER_PAGE), "keyword": keyword, "q": q},
+        {"page": page_obj, "keyword": keyword, "q": q, "hooks": _hooks_for(page_obj.items)},
     )
 
 
@@ -264,10 +276,12 @@ def author_page(request: Request, key: str):
     mine = views.by_author(_items(), key)
     if not mine:
         raise HTTPException(status_code=404)
+    vids = views.videos(mine)
+    blogs = views.blogs(mine)
     return templates.TemplateResponse(
         request,
         "author.html",
-        {"key": key, "videos": views.videos(mine), "blogs": views.blogs(mine)},
+        {"key": key, "videos": vids, "blogs": blogs, "hooks": _hooks_for(vids + blogs)},
     )
 
 

@@ -3,6 +3,7 @@
   <div class="blogtext">
     <a class="title" href="/blogs/{{ it.id }}">{{ it.title }}</a>{% if it.origin == "self" %} <span class="badge-origin">原创</span>{% endif %}
     <div class="sub">{{ it.author }} · {{ it.published_at[:10] }}{% if it.site_name %} · {{ it.site_name }}{% endif %}</div>
+    {% if hooks and hooks.get(it.id) %}<p class="hook">{{ hooks[it.id] }}</p>{% endif %}
     <p class="summary">{{ it.summary }}</p>
   </div>
 </li>
