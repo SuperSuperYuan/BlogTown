@@ -69,8 +69,14 @@ Source layout uses a `src/` directory; package is `aishelf`.
   like `notes.py`; pure persistence — route triggers the DB re-sync),
   `allowlist.py` (collect passcode gate),
   `schedules.py` (config load + pure `due_schedules`), `schedule_state.py`
-  (last-run dates), `scheduler.py` (background `run_due_now` loop), `templates/`,
-  `static/`, `__main__.py`.
+  (last-run dates), `scheduler.py` (background `run_due_now` loop),
+  `collide.py` (idea-collision: pure `pick_pair`/`random_pair` — a surprising
+  pair with embedding cosine in a mid band [0.30, 0.50) below the graph edge
+  floor, preferring cross-type/author — plus `load_pair_space` loader and
+  `build_messages`; surfaced by `GET /collide` + `POST /collide/chat`, which
+  emits the chosen pair then streams a three-part 中文 synthesis via
+  `llm.stream_completion`; on-demand, no persistence, reuses `ATLAS_CHAT_*`/`ATLAS_EMBED_*`),
+  `templates/`, `static/`, `__main__.py`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
   `connect`/`init_db`; the `items` table now includes `embedding BLOB`,
@@ -133,7 +139,9 @@ browse/search pages still read files. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
 surface by PCA of embeddings, glowing arcs for edges, alias labels; OrbitControls
 drag-rotate + scroll-zoom + auto-rotate; hover, click, type filter, search
-highlight); `GET /api/graph` serves the raw `{nodes, edges}` JSON. Initial
+highlight); `GET /api/graph` serves the raw `{nodes, edges}` JSON.
+`GET /collide` renders the 灵感碰撞 page; `POST /collide/chat` picks a
+surprising pair (embedding cosine mid-band) and streams a three-part 中文 synthesis. Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
 columns including `note`, backfill embeddings (when `ATLAS_EMBED_*` is
 configured) for hybrid `/ask` retrieval, backfill the `edges` table,
