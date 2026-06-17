@@ -87,11 +87,12 @@ def sync(data_dir, db_path=None) -> SyncSummary:
         summary = SyncSummary()
         existing = {
             r["id"]: (r["content_hash"], r["embedding_model"], r["has_emb"],
-                      r["title"], r["has_alias"])
+                      r["title"], r["has_alias"], r["has_hook"])
             for r in con.execute(
                 "SELECT id, content_hash, embedding_model, "
                 "(embedding IS NOT NULL) AS has_emb, title, "
-                "(alias IS NOT NULL AND alias != '') AS has_alias FROM items"
+                "(alias IS NOT NULL AND alias != '') AS has_alias, "
+                "(hook IS NOT NULL AND hook != '') AS has_hook FROM items"
             )
         }
         synced_at = datetime.now(timezone.utc).isoformat()
@@ -99,6 +100,7 @@ def sync(data_dir, db_path=None) -> SyncSummary:
         embed_model = embed.model_name()  # None when unconfigured
         to_embed: list[tuple] = []        # (item, note) needing (re)embedding
         to_alias: list = []               # items needing a (re)generated alias
+        to_hook: list = []                # items needing a (re)generated hook
 
         placeholders = ", ".join(f":{c}" for c in _COLUMNS)
         updates = ", ".join(f"{c}=excluded.{c}" for c in _COLUMNS if c != "id")
@@ -119,7 +121,10 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             needs_alias = alias.is_configured() and (
                 prev is None or it.title != prev[3] or not prev[4]
             )
-            if not needs_index and not needs_emb and not needs_alias:
+            needs_hook = alias.is_configured() and (
+                prev is None or it.title != prev[3] or not prev[5]
+            )
+            if not needs_index and not needs_emb and not needs_alias and not needs_hook:
                 summary.unchanged += 1
                 continue
             if needs_index:
@@ -145,6 +150,8 @@ def sync(data_dir, db_path=None) -> SyncSummary:
                 to_embed.append((it, note))
             if needs_alias:
                 to_alias.append(it)
+            if needs_hook:
+                to_hook.append(it)
 
         embedded_ids: list[str] = []
         if to_embed and embed_model:
@@ -172,6 +179,17 @@ def sync(data_dir, db_path=None) -> SyncSummary:
                 logger.warning(
                     "generate_aliases returned %d for %d items; skipping alias update",
                     len(new_aliases), len(to_alias),
+                )
+
+        if to_hook:
+            new_hooks = alias.generate_hooks([(it.title, it.summary) for it in to_hook])
+            if new_hooks and len(new_hooks) == len(to_hook):
+                for it, hk in zip(to_hook, new_hooks):
+                    con.execute("UPDATE items SET hook=? WHERE id=?", (hk, it.id))
+            elif new_hooks:
+                logger.warning(
+                    "generate_hooks returned %d for %d items; skipping hook update",
+                    len(new_hooks), len(to_hook),
                 )
 
         stale = [i for i in existing if i not in seen]
