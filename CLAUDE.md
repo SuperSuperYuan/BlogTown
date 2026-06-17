@@ -62,8 +62,13 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `source_refs`, plus `nav_types`/`nav_candidates`/`nav_refs` for jump-cards and
   `is_low_confidence` for the empty→collect guide — fires when `retrieve` returns
   nothing, since `retrieve` already owns the relevance gate), `llm.py` (chat-model
-  client, `ATLAS_CHAT_*`, `stream_completion`), `notes.py` (per-item notes),
-  `items.py` (`safe_id` + `delete_item`), `markdown.py` (render user markdown →
+  client, `ATLAS_CHAT_*`, `stream_completion`), `notes.py` (per-item notes;
+  detail routes pass `note_html` pre-rendered via `markdown.render_markdown`;
+  the template `_note_editor.html` shows the rendered view by default with an 「编辑」
+  button to switch to the textarea, and shows the textarea directly when there is no
+  note yet; `POST /notes/{id}` saves the text and returns `{"html": …}` so the
+  client swaps the view in place without a reload), `items.py` (`safe_id` +
+  `delete_item`), `markdown.py` (render user markdown →
   sanitized HTML via markdown-it-py + nh3; never raises), `posts.py`
   (`create_post`/`read_post`/`update_post` for self-authored blogs; atomic writes
   like `notes.py`; pure persistence — route triggers the DB re-sync),
