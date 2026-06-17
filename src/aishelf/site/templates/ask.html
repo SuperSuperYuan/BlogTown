@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Poppins:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/topbar.css">
 <style>/* LibTV Design System — Colors + Type
  * Source of truth: liblibai-monorepo/apps/liblibtv/src/styles/tokens/*
  * LibTV is dark-first (--color-neutral-950 background).
@@ -619,44 +620,22 @@
 </style>
 
 <style>
-  /* Atlas top nav + full-screen /ask layout */
+  /* full-screen /ask layout (nav comes from the shared _topbar.html + topbar.css) */
   body { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; min-height: 100vh; }
-  /* Match the shared base.html .topbar (dark) so /ask's nav is identical to every other page. */
-  .atlas-topbar { flex: none; display: flex; align-items: center; gap: 20px; padding: 12px 20px; background: #1f2933; color: #fff; }
-  .atlas-logo { font-weight: 700; font-size: 18px; color: #fff; text-decoration: none; }
-  .atlas-nav { display: flex; }
-  .atlas-nav a { margin-right: 14px; color: #cbd2d9; text-decoration: none; }
-  .atlas-nav a:hover { color: #fff; }
-  .atlas-search { margin-left: auto; display: flex; gap: 6px; }
-  .atlas-search input { padding: 7px 10px; border: none; border-radius: 8px; width: 240px; font-family: var(--ff-cjk); font-size: 14px; }
-  .atlas-search button { padding: 7px 14px; border: none; border-radius: 8px; background: #0a84ff; color: #fff; cursor: pointer; font-family: var(--ff-cjk); }
-  .atlas-search button:hover { background: var(--accent-deep); }
+  /* topbar.css gives .topbar position: sticky; in this flex-column body it must not grow/shrink */
+  .topbar { flex: none; }
   /* Expand the chat app to fill the viewport below the nav (was a 1240x760 card) */
   .app { max-width: none; width: 100%; height: auto; flex: 1; min-height: 0; border: none; border-radius: 0; box-shadow: none; }
   @media (max-width: 920px) {
     .app { grid-template-columns: 1fr; max-width: none; height: auto; }
     .stage { min-height: 320px; }
     .chat { height: auto; min-height: 0; flex: 1; }
-    .atlas-search input { width: 140px; }
   }
 </style>
 </head>
 
 <body>
-  <header class="atlas-topbar">
-    <a class="atlas-logo" href="/">Atlas</a>
-    <nav class="atlas-nav">
-      <a href="/videos">视频</a>
-      <a href="/blogs">博客</a>
-      <a href="/ask">问答</a>
-      <a href="/graph">图谱</a>
-      <a href="/collect">Hermes</a>
-    </nav>
-    <form class="atlas-search" action="/search" method="get">
-      <input name="q" placeholder="搜索标题/摘要/关键词" />
-      <button type="submit">搜索</button>
-    </form>
-  </header>
+  {% include "_topbar.html" %}
   <div class="app">
     <!-- ===================== LEFT: STAGE ===================== -->
     <section class="stage">
