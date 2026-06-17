@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 import logging
 import os
+import random
 import threading
 from contextlib import asynccontextmanager
 from dataclasses import asdict, replace
@@ -25,6 +26,7 @@ from aishelf.db.config import default_db_path
 from aishelf.site import (
     allowlist,
     ask,
+    collide,
     collect,
     hermes,
     items,
@@ -100,6 +102,34 @@ def _hooks_for(items):
         )
     except Exception:  # derived view; never fatal
         return {}
+
+
+def _collide_ref(it) -> dict:
+    return {"id": it.id, "type": it.type, "title": it.title, "author": it.author}
+
+
+def _item_dict(it) -> dict:
+    return {"title": it.title, "summary": it.summary, "keywords": it.keywords,
+            "author": it.author, "type": it.type}
+
+
+def _resolve_pair(items, space, *, a_id, b_id, lock_id, rng):
+    """Resolve a (item_a, item_b) pair from explicit ids, else a surprising pick
+    (with random fallback). Returns None when no pair can be formed."""
+    by_id = {it.id: it for it in items}
+    if a_id and b_id and a_id != b_id:
+        pair = (a_id, b_id)
+    else:
+        ids, matrix, meta = space
+        pair = collide.pick_pair(ids, matrix, meta, lock_id=lock_id, rng=rng)
+        if pair is None:
+            pair = collide.random_pair(list(by_id), lock_id=lock_id, rng=rng)
+    if pair is None:
+        return None
+    a, b = by_id.get(pair[0]), by_id.get(pair[1])
+    if a is None or b is None:
+        return None
+    return (a, b)
 
 
 templates.env.filters["duration"] = _fmt_duration
@@ -310,6 +340,12 @@ class _ChatRequest(BaseModel):
     messages: list[_Message]
 
 
+class _CollideRequest(BaseModel):
+    a_id: str | None = None
+    b_id: str | None = None
+    lock_id: str | None = None
+
+
 @app.get("/collect", response_class=HTMLResponse)
 def collect_page(request: Request, q: str = ""):
     return templates.TemplateResponse(
@@ -372,6 +408,32 @@ def ask_chat(req: _ChatRequest):
             if candidates:
                 yield hermes.sse({"jump": ask.nav_refs(candidates)})
         yield from llm.stream_completion(payload)
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.get("/collide", response_class=HTMLResponse)
+def collide_page(request: Request):
+    return templates.TemplateResponse(request, "collide.html", {})
+
+
+@app.post("/collide/chat")
+def collide_chat(req: _CollideRequest):
+    # Ungated: synthesis is cheap (like /ask), not the costly Hermes path.
+    data_dir = get_data_dir()
+    items = _items()
+    space = collide.load_pair_space(default_db_path(data_dir))
+    pair = _resolve_pair(items, space, a_id=req.a_id, b_id=req.b_id,
+                         lock_id=req.lock_id, rng=random.Random())
+
+    def _gen():
+        if pair is None:
+            yield hermes.sse({"error": "先去采集一些内容再来碰撞"})
+            yield hermes.sse({"done": True})
+            return
+        a, b = pair
+        yield hermes.sse({"pair": {"a": _collide_ref(a), "b": _collide_ref(b)}})
+        yield from llm.stream_completion(collide.build_messages(_item_dict(a), _item_dict(b)))
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
 
