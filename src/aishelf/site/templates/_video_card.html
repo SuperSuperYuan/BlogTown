@@ -4,4 +4,5 @@
   </span>
   <span class="title">{{ it.title }}</span>
   <span class="sub">{{ it.author }} · {{ it.published_at[:10] }}</span>
+  {% if hooks and hooks.get(it.id) %}<span class="hook">{{ hooks[it.id] }}</span>{% endif %}
 </a>

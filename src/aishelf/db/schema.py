@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS items (
   embedding_model   TEXT,
   embedding_dim     INTEGER,
   alias             TEXT,
+  hook              TEXT,
   content_hash  TEXT NOT NULL,
   synced_at     TEXT NOT NULL
 );

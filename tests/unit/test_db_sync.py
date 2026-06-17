@@ -350,3 +350,85 @@ def test_sync_backfills_missing_alias_without_title_change(tmp_path, monkeypatch
     monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: ["补的别名"] * len(pairs))
     sync(data, db)
     assert _alias_of(db, "v1") == "补的别名"
+
+
+# ---------------------------------------------------------------------------
+# Hook tests (一句话钩子)
+# ---------------------------------------------------------------------------
+
+def _hook_of(db_path, vid):
+    con = schema.connect(db_path)
+    row = con.execute("SELECT hook FROM items WHERE id=?", (vid,)).fetchone()
+    con.close()
+    return row["hook"]
+
+
+def test_sync_stores_hook_for_new_item(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)
+    monkeypatch.setattr(_alias, "generate_hooks", lambda pairs: ["为什么值得看"] * len(pairs))
+    sync(data, db)
+    assert _hook_of(db, "v1") == "为什么值得看"
+
+
+def test_sync_skips_hook_when_unconfigured(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)
+    sync(data, db)
+    assert _hook_of(db, "v1") is None
+
+
+def test_sync_regenerates_hook_on_title_change_not_note(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)
+    calls = {"n": 0}
+
+    def _gen(pairs):
+        calls["n"] += 1
+        return [f"钩子{calls['n']}"] * len(pairs)
+
+    monkeypatch.setattr(_alias, "generate_hooks", _gen)
+    sync(data, db)
+    assert calls["n"] == 1 and _hook_of(db, "v1") == "钩子1"
+
+    # note-only change: hook must NOT regenerate
+    (data / "notes").mkdir(exist_ok=True)
+    (data / "notes" / "v1.json").write_text(
+        json.dumps({"id": "v1", "text": "新笔记", "updated_at": "2024-02-01"}, ensure_ascii=False),
+        encoding="utf-8")
+    sync(data, db)
+    assert calls["n"] == 1 and _hook_of(db, "v1") == "钩子1"
+
+    # title change: hook regenerates
+    rec = json.loads((data / "videos" / "v1.json").read_text(encoding="utf-8"))
+    rec["title"] = "全新的标题"
+    (data / "videos" / "v1.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    sync(data, db)
+    assert calls["n"] == 2 and _hook_of(db, "v1") == "钩子2"
+
+
+def test_sync_backfills_missing_hook_without_title_change(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    _write_video(data, "v1")
+    db = tmp_path / "atlas.db"
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: True)
+    monkeypatch.setattr(_alias, "generate_aliases", lambda pairs: None)
+    monkeypatch.setattr(_alias, "generate_hooks", lambda pairs: None)  # first sync: gen fails
+    sync(data, db)
+    assert _hook_of(db, "v1") is None
+    # same title, generation now works -> hook backfilled
+    monkeypatch.setattr(_alias, "generate_hooks", lambda pairs: ["补的钩子"] * len(pairs))
+    sync(data, db)
+    assert _hook_of(db, "v1") == "补的钩子"

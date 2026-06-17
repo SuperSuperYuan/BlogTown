@@ -187,3 +187,46 @@ def test_self_post_is_searchable_after_create(rw_client):
     db_sync.sync(data_dir, default_db_path(data_dir))
     r = rw_client.get("/api/search", params={"q": "可检索原创"})
     assert any("可检索原创" in hit["title"] for hit in r.json()["results"])
+
+
+def _seed_hook_site(tmp_path, monkeypatch):
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AISHELF_DB_PATH", str(tmp_path / "atlas.db"))
+    rec = {"id": "v1", "type": "video", "title": "大语言模型", "author": "作者甲",
+           "platform": "youtube", "source_url": "https://x/v1",
+           "published_at": "2024-01-01", "summary": "摘要", "keywords": [],
+           "collected_at": "2024-01-02T00:00:00", "thumbnail_url": "https://img/x.jpg"}
+    (tmp_path / "videos").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "videos" / "v1.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    from aishelf.db.sync import sync
+    from aishelf.db import schema
+    sync(tmp_path, tmp_path / "atlas.db")
+    con = schema.connect(tmp_path / "atlas.db")
+    con.execute("UPDATE items SET hook=? WHERE id=?", ("一眼说清为什么值得看", "v1"))
+    con.commit()
+    con.close()
+
+
+def test_videos_page_shows_hook(tmp_path, monkeypatch):
+    _seed_hook_site(tmp_path, monkeypatch)
+    from aishelf.site.app import app
+    client = TestClient(app)
+    r = client.get("/videos")
+    assert r.status_code == 200
+    assert "一眼说清为什么值得看" in r.text
+
+
+def test_videos_page_renders_without_hook(tmp_path, monkeypatch):
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AISHELF_DB_PATH", str(tmp_path / "atlas.db"))
+    rec = {"id": "v1", "type": "video", "title": "无钩子视频", "author": "作者甲",
+           "platform": "youtube", "source_url": "https://x/v1",
+           "published_at": "2024-01-01", "summary": "摘要", "keywords": [],
+           "collected_at": "2024-01-02T00:00:00", "thumbnail_url": "https://img/x.jpg"}
+    (tmp_path / "videos").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "videos" / "v1.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    from aishelf.site.app import app
+    client = TestClient(app)
+    r = client.get("/videos")
+    assert r.status_code == 200
+    assert "无钩子视频" in r.text

@@ -133,3 +133,42 @@ def test_get_by_ids_empty(tmp_path):
     db = tmp_path / "atlas.db"
     _seed_direct(db)
     assert search_mod.get_by_ids(db, []) == {}
+
+
+# ---------------------------------------------------------------------------
+# hooks_for
+# ---------------------------------------------------------------------------
+
+from aishelf.db.search import hooks_for
+
+
+def _set_hook(db_path, vid, hook):
+    con = schema.connect(db_path)
+    con.execute("UPDATE items SET hook=? WHERE id=?", (hook, vid))
+    con.commit()
+    con.close()
+
+
+def test_hooks_for_returns_map(tmp_path):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write(data, "videos", "v1", "标题一")
+    _write(data, "blogs", "b1", "标题二")
+    sync(data, db)
+    _set_hook(db, "v1", "钩子一")
+    _set_hook(db, "b1", "钩子二")
+    assert hooks_for(db, ["v1", "b1"]) == {"v1": "钩子一", "b1": "钩子二"}
+
+
+def test_hooks_for_skips_empty_and_missing(tmp_path):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write(data, "videos", "v1", "标题一")
+    _write(data, "videos", "v2", "标题二")
+    sync(data, db)
+    _set_hook(db, "v1", "有钩子")
+    _set_hook(db, "v2", "")  # empty hook -> omitted
+    assert hooks_for(db, ["v1", "v2", "nope"]) == {"v1": "有钩子"}
+
+
+def test_hooks_for_empty_ids_returns_empty(tmp_path):
+    db = tmp_path / "atlas.db"
+    assert hooks_for(db, []) == {}
