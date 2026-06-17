@@ -69,3 +69,18 @@ def test_saving_note_triggers_db_sync(client, monkeypatch):
     r = client.post("/notes/youtube-aaa", json={"text": "让笔记进入搜索索引"})
     assert r.status_code == 200
     assert done.wait(timeout=5)  # background sync ran after the note was saved
+
+
+def test_save_note_returns_rendered_html(client):
+    r = client.post("/notes/youtube-aaa", json={"text": "**重点** 内容"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert "updated_at" in body
+    assert "<strong>重点</strong>" in body["html"]
+
+
+def test_save_empty_note_returns_blank_html(client):
+    r = client.post("/notes/youtube-aaa", json={"text": ""})
+    assert r.status_code == 200
+    assert r.json()["html"] == ""

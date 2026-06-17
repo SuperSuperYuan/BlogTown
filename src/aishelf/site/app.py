@@ -529,7 +529,7 @@ def save_note_route(item_id: str, req: _NoteRequest):
         raise HTTPException(status_code=400, detail="invalid note id")
     # The note text feeds search; refresh the derived index off-thread.
     _sync_db_async(get_data_dir())
-    return {"ok": True, "updated_at": updated_at}
+    return {"ok": True, "updated_at": updated_at, "html": markdown.render_markdown(req.text)}
 
 
 @app.post("/delete/{item_id}")
