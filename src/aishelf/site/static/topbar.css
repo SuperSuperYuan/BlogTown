@@ -1,0 +1,14 @@
+/* Shared top navigation bar — used by base.html (every page) and the
+ * standalone ask.html via the _topbar.html partial. Single source of truth
+ * for the nav markup (_topbar.html) + styling (this file). */
+.topbar { display: flex; align-items: center; gap: 20px; padding: 12px 20px; background: #1f2933; color: #fff; position: sticky; top: 0; z-index: 10; }
+.topbar .brand { font-weight: 700; font-size: 18px; color: #fff; }
+.topbar nav a { margin-right: 14px; color: #cbd2d9; }
+.topbar nav a:hover { color: #fff; }
+.topbar .search { margin-left: auto; display: flex; gap: 6px; }
+.topbar .search input { padding: 7px 10px; border: none; border-radius: 8px; width: 240px; }
+.topbar .search button { padding: 7px 14px; border: none; border-radius: 8px; background: #0a84ff; color: #fff; cursor: pointer; }
+.topbar .search button:hover { background: #0070e0; }
+@media (max-width: 920px) {
+  .topbar .search input { width: 140px; }
+}
