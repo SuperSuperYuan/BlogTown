@@ -8,6 +8,7 @@ MATCH/bm25 — required by FTS5.
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass
 
 from aishelf.db import schema, tokenize
@@ -84,3 +85,26 @@ def get_by_ids(db_path, ids: list[str]) -> "dict[str, SearchHit]":
         return {r["id"]: _hit(r) for r in rows}
     finally:
         con.close()
+
+
+def hooks_for(db_path, ids: list[str]) -> dict[str, str]:
+    """Map of {id: hook} for ids with a non-empty hook (others omitted).
+    Returns {} for empty input or an unopenable/old DB — the hook is a derived
+    nicety and must never be fatal to a page render."""
+    if not ids:
+        return {}
+    try:
+        con = schema.connect(db_path)
+        try:
+            schema.init_db(con)
+            placeholders = ",".join("?" for _ in ids)
+            rows = con.execute(
+                f"SELECT id, hook FROM items WHERE id IN ({placeholders}) "
+                "AND hook IS NOT NULL AND hook != ''",
+                list(ids),
+            ).fetchall()
+            return {r["id"]: r["hook"] for r in rows}
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return {}
