@@ -25,6 +25,14 @@ _PROMPT = (
     "不要输出任何额外文字或解释。\n\n"
 )
 
+HOOK_MAX_CHARS = 40  # safety cap; the prompt asks for <= 30 Chinese chars
+
+_HOOK_PROMPT = (
+    "为下列每条内容各写一句话，说明它为什么值得一看（不超过30个汉字），"
+    "要具体、有信息量、能勾起兴趣，不要空话套话。只返回一个 JSON 字符串数组，"
+    "元素顺序与输入编号一致，不要输出任何额外文字或解释。\n\n"
+)
+
 
 def get_alias_settings() -> dict[str, str] | None:
     base = os.environ.get("ATLAS_CHAT_BASE_URL")
@@ -50,14 +58,14 @@ def _extract_json_array(text: str) -> str:
     return text[i:j + 1]
 
 
-def _clean(a: str) -> str:
-    return (a or "").strip().strip('"「」""').strip()[:ALIAS_MAX_CHARS]
+def _clean(a: str, cap: int = ALIAS_MAX_CHARS) -> str:
+    return (a or "").strip().strip('"「」""').strip()[:cap]
 
 
-def generate_aliases(pairs: list[tuple[str, str]]) -> list[str] | None:
-    """≤8-char aliases for (title, summary) pairs, or None if unconfigured /
-    empty / on any error or parse mismatch. Batched (ALIAS_BATCH_SIZE per call);
-    each batch must return a JSON array of the same length (all-or-nothing)."""
+def _generate_strings(prompt: str, pairs: list[tuple[str, str]], cap: int) -> list[str] | None:
+    """Batched LLM call returning one cleaned string per (title, summary) pair,
+    or None if unconfigured / empty / on any error or parse mismatch. Each batch
+    must return a JSON array of the same length (all-or-nothing)."""
     s = get_alias_settings()
     if s is None or not pairs:
         return None
@@ -72,15 +80,25 @@ def generate_aliases(pairs: list[tuple[str, str]]) -> list[str] | None:
             )
             resp = client.chat.completions.create(
                 model=s["model"],
-                messages=[{"role": "user", "content": _PROMPT + listing}],
+                messages=[{"role": "user", "content": prompt + listing}],
                 stream=False,
             )
             content = resp.choices[0].message.content or ""
             arr = json.loads(_extract_json_array(content))
             if not isinstance(arr, list) or len(arr) != len(chunk):
                 return None
-            out.extend(_clean(str(x)) for x in arr)
+            out.extend(_clean(str(x), cap) for x in arr)
         return out
-    except Exception as exc:  # degrade to truncated-title fallback, never crash sync
-        logger.warning("alias generation failed: %s", exc)
+    except Exception as exc:  # degrade to caller fallback, never crash sync
+        logger.warning("string generation failed: %s", exc)
         return None
+
+
+def generate_aliases(pairs: list[tuple[str, str]]) -> list[str] | None:
+    """≤8-char graph-node aliases for (title, summary) pairs (see _generate_strings)."""
+    return _generate_strings(_PROMPT, pairs, ALIAS_MAX_CHARS)
+
+
+def generate_hooks(pairs: list[tuple[str, str]]) -> list[str] | None:
+    """One-sentence "why watch" hooks (≤30 chars) for (title, summary) pairs."""
+    return _generate_strings(_HOOK_PROMPT, pairs, HOOK_MAX_CHARS)

@@ -117,3 +117,45 @@ def test_generate_aliases_batch_failure_returns_none(monkeypatch):
     client = SimpleNamespace(chat=SimpleNamespace(completions=_FailSecond()))
     monkeypatch.setattr(alias, "get_client", lambda s: client)
     assert alias.generate_aliases([("a", ""), ("b", ""), ("c", "")]) is None  # batch-2 failure -> all None
+
+
+def test_generate_hooks_not_configured_returns_none(monkeypatch):
+    monkeypatch.delenv("ATLAS_CHAT_BASE_URL", raising=False)
+    monkeypatch.delenv("ATLAS_CHAT_MODEL", raising=False)
+    assert alias.generate_hooks([("t", "s")]) is None
+
+
+def test_generate_hooks_parses_json_array(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient('["讲清楚了RAG为何失效", "手把手搭Agent"]'))
+    out = alias.generate_hooks([("RAG paper", "x"), ("Agent guide", "y")])
+    assert out == ["讲清楚了RAG为何失效", "手把手搭Agent"]
+
+
+def test_generate_hooks_empty_input_returns_none(monkeypatch):
+    _configure(monkeypatch)
+    assert alias.generate_hooks([]) is None
+
+
+def test_generate_hooks_wrong_length_returns_none(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient('["仅一句"]'))
+    assert alias.generate_hooks([("a", ""), ("b", "")]) is None
+
+
+def test_generate_hooks_client_error_returns_none(monkeypatch):
+    _configure(monkeypatch)
+
+    def _boom(s):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(alias, "get_client", _boom)
+    assert alias.generate_hooks([("a", "")]) is None
+
+
+def test_generate_hooks_caps_length(monkeypatch):
+    _configure(monkeypatch)
+    long = "很" * 60
+    monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient(f'["{long}"]'))
+    out = alias.generate_hooks([("a", "")])
+    assert len(out) == 1 and len(out[0]) <= alias.HOOK_MAX_CHARS
