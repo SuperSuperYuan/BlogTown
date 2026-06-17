@@ -65,3 +65,60 @@ def test_random_pair_honors_lock():
 
 def test_random_pair_none_when_too_few():
     assert collide.random_pair(["a"], rng=random.Random(0)) is None
+
+
+import json
+
+from aishelf import embed, alias as _alias
+from aishelf.db.sync import sync
+
+
+def _write_video(data_dir, vid, summary="普通摘要"):
+    (data_dir / "videos").mkdir(parents=True, exist_ok=True)
+    rec = {"id": vid, "type": "video", "title": f"标题{vid}", "author": "作者甲",
+           "platform": "youtube", "source_url": f"https://x/{vid}",
+           "published_at": "2024-01-01", "summary": summary, "keywords": [],
+           "collected_at": "2024-01-02T00:00:00", "thumbnail_url": "https://img/x.jpg"}
+    (data_dir / "videos" / f"{vid}.json").write_text(
+        json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+
+
+def test_load_pair_space_empty_when_no_embeddings(tmp_path, monkeypatch):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write_video(data, "v1")
+    monkeypatch.setattr(embed, "model_name", lambda: None)
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)
+    sync(data, db)
+    ids, matrix, meta = collide.load_pair_space(db)
+    assert ids == [] and meta == {} and matrix.shape[0] == 0
+
+
+def test_load_pair_space_groups_embedded(tmp_path, monkeypatch):
+    data, db = tmp_path / "data", tmp_path / "atlas.db"
+    _write_video(data, "v1")
+    _write_video(data, "v2")
+    monkeypatch.setattr(embed, "model_name", lambda: "m")
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0] for _ in texts])
+    monkeypatch.setattr(_alias, "is_configured", lambda: False)
+    sync(data, db)
+    ids, matrix, meta = collide.load_pair_space(db)
+    assert set(ids) == {"v1", "v2"}
+    assert matrix.shape == (2, 2)
+    assert meta["v1"]["type"] == "video" and meta["v1"]["author"] == "作者甲"
+
+
+def test_load_pair_space_tolerates_missing_db(tmp_path):
+    ids, matrix, meta = collide.load_pair_space(tmp_path / "nope.db")
+    assert ids == [] and meta == {}
+
+
+def test_build_messages_structure():
+    msgs = collide.build_messages(
+        {"title": "标题A", "summary": "摘要A", "keywords": ["k1"], "author": "作者A", "type": "video"},
+        {"title": "标题B", "summary": "摘要B", "keywords": [], "author": "作者B", "type": "blog"},
+    )
+    assert msgs[0]["role"] == "system" and msgs[1]["role"] == "user"
+    for label in ["【共同的暗线】", "【关键张力】", "【碰撞出的新点子】"]:
+        assert label in msgs[0]["content"]
+    assert "Markdown" in msgs[0]["content"]
+    assert "标题A" in msgs[1]["content"] and "标题B" in msgs[1]["content"]
