@@ -218,14 +218,21 @@ main:has(.write) { max-width: 1280px; }
 .collide-controls button { background: #0a84ff; color: #fff; border: none; border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
 .collide-controls button:disabled { opacity: .5; cursor: default; }
 .collide-result { white-space: pre-wrap; line-height: 1.7; color: #1f2933; background: #fafbfc; border: 1px solid #e7e9ef; border-radius: 12px; padding: 16px; min-height: 60px; }
-.digest { background: #fafbfc; border: 1px solid #e7e9ef; border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; }
-.digest h2 { margin: 0 0 8px; font-size: 16px; }
+/* Home: main column + right digest sidebar (stacks on narrow screens). */
+.home-layout { display: flex; gap: 24px; align-items: flex-start; }
+.home-main { flex: 1 1 auto; min-width: 0; }
+.digest { flex: 0 0 248px; background: #fafbfc; border: 1px solid #e7e9ef; border-radius: 12px; padding: 12px 14px; position: sticky; top: 16px; }
+.digest h2 { margin: 0 0 8px; font-size: 13px; color: #52606d; letter-spacing: .02em; }
 .digest-list { list-style: none; margin: 0; padding: 0; }
-.digest-item { padding: 6px 0; border-bottom: 1px solid #eef0f3; }
+.digest-item { padding: 5px 0; border-bottom: 1px solid #eef0f3; }
 .digest-item:last-child { border-bottom: none; }
-.digest .d-title { font-weight: 600; color: #1f2933; text-decoration: none; }
+.digest .d-title { font-weight: 600; color: #1f2933; text-decoration: none; font-size: 12.5px; line-height: 1.35; }
 .digest .d-title:hover { color: #0a84ff; }
-.digest .d-meta { margin-left: 8px; font-size: 12px; color: #7b8794; }
-.digest .d-hook { margin: 2px 0 0; color: #3e4c59; font-size: 13px; }
+.digest .d-meta { display: block; margin-top: 1px; font-size: 11px; color: #9aa5b1; }
+.digest .d-hook { margin: 2px 0 0; color: #7b8794; font-size: 11.5px; line-height: 1.4; }
 .digest-gem { margin-top: 10px; padding-top: 10px; border-top: 2px solid #e7e9ef; }
-.digest-gem .gem-label { display: inline-block; font-size: 12px; color: #0a84ff; margin-right: 6px; font-weight: 600; }
+.digest-gem .gem-label { display: inline-block; font-size: 11px; color: #0a84ff; margin-right: 6px; font-weight: 600; }
+@media (max-width: 820px) {
+  .home-layout { flex-direction: column; }
+  .digest { flex-basis: auto; width: 100%; position: static; order: -1; }
+}

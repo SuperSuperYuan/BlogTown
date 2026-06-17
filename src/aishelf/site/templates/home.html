@@ -1,34 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
-{% if digest and digest.recent %}
-<section class="digest">
-  <h2>今日速读</h2>
-  <ul class="digest-list">
-    {% for e in digest.recent %}
-    <li class="digest-item">
-      <a class="d-title" href="{{ '/videos/' if e.item.type == 'video' else '/blogs/' }}{{ e.item.id }}">{{ e.item.title }}</a>
-      <span class="d-meta">{{ '视频' if e.item.type == 'video' else '博客' }} · {{ e.item.collected_at[:10] }}</span>
-      {% if e.hook %}<p class="d-hook">{{ e.hook }}</p>{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-  {% if digest.gem %}
-  <div class="digest-gem">
-    <span class="gem-label">翻出来</span>
-    <a class="d-title" href="{{ '/videos/' if digest.gem.item.type == 'video' else '/blogs/' }}{{ digest.gem.item.id }}">{{ digest.gem.item.title }}</a>
-    {% if digest.gem.hook %}<p class="d-hook">{{ digest.gem.hook }}</p>{% endif %}
-  </div>
+<div class="home-layout">
+  <main class="home-main">
+    <section>
+      <h2>最新视频 <a class="more" href="/videos">更多 →</a></h2>
+      {% if videos %}<div class="grid">{% for it in videos %}{% include "_video_card.html" %}{% endfor %}</div>
+      {% else %}<p class="empty">暂无内容</p>{% endif %}
+    </section>
+    <section>
+      <h2>最新博客 <a class="more" href="/blogs">更多 →</a></h2>
+      {% if blogs %}<ul class="bloglist">{% for it in blogs %}{% include "_blog_row.html" %}{% endfor %}</ul>
+      {% else %}<p class="empty">暂无内容</p>{% endif %}
+    </section>
+  </main>
+  {% if digest and digest.recent %}
+  <aside class="digest">
+    <h2>今日速读</h2>
+    <ul class="digest-list">
+      {% for e in digest.recent %}
+      <li class="digest-item">
+        <a class="d-title" href="{{ '/videos/' if e.item.type == 'video' else '/blogs/' }}{{ e.item.id }}">{{ e.item.title }}</a>
+        <span class="d-meta">{{ '视频' if e.item.type == 'video' else '博客' }} · {{ e.item.collected_at[:10] }}</span>
+        {% if e.hook %}<p class="d-hook">{{ e.hook }}</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if digest.gem %}
+    <div class="digest-gem">
+      <span class="gem-label">翻出来</span>
+      <a class="d-title" href="{{ '/videos/' if digest.gem.item.type == 'video' else '/blogs/' }}{{ digest.gem.item.id }}">{{ digest.gem.item.title }}</a>
+      {% if digest.gem.hook %}<p class="d-hook">{{ digest.gem.hook }}</p>{% endif %}
+    </div>
+    {% endif %}
+  </aside>
   {% endif %}
-</section>
-{% endif %}
-<section>
-  <h2>最新视频 <a class="more" href="/videos">更多 →</a></h2>
-  {% if videos %}<div class="grid">{% for it in videos %}{% include "_video_card.html" %}{% endfor %}</div>
-  {% else %}<p class="empty">暂无内容</p>{% endif %}
-</section>
-<section>
-  <h2>最新博客 <a class="more" href="/blogs">更多 →</a></h2>
-  {% if blogs %}<ul class="bloglist">{% for it in blogs %}{% include "_blog_row.html" %}{% endfor %}</ul>
-  {% else %}<p class="empty">暂无内容</p>{% endif %}
-</section>
+</div>
 {% endblock %}

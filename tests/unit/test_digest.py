@@ -35,6 +35,14 @@ def test_gem_deterministic_per_today():
     assert c.gem.item.id not in {e.item.id for e in c.recent}
 
 
+def test_gem_rotates_across_days():
+    # older pool has 4 items (i4..i1); over many days the seeded pick varies.
+    items = [_it(f"i{n}", f"2024-01-{n:02d}T00:00:00") for n in range(1, 10)]
+    gems = {digest_mod.build_digest(items, {}, today=f"2026-06-{d:02d}").gem.item.id
+            for d in range(1, 29)}
+    assert len(gems) > 1   # the gem is seed-dependent and rotates over days
+
+
 def test_no_gem_when_no_older():
     items = [_it("a", "2024-01-02T00:00:00"), _it("b", "2024-01-01T00:00:00")]
     d = digest_mod.build_digest(items, {}, today="2026-06-17", recent_n=5)
