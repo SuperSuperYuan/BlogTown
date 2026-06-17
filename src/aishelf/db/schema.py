@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS items (
   embedding_dim     INTEGER,
   alias             TEXT,
   hook              TEXT,
+  cluster           INTEGER,
   content_hash  TEXT NOT NULL,
   synced_at     TEXT NOT NULL
 );
@@ -48,6 +49,12 @@ CREATE TABLE IF NOT EXISTS edges (
   dst    TEXT NOT NULL,
   weight REAL NOT NULL,
   PRIMARY KEY (src, dst)
+);
+CREATE TABLE IF NOT EXISTS clusters (
+  id        INTEGER PRIMARY KEY,
+  name      TEXT,
+  color     TEXT,
+  signature TEXT
 );
 """
 

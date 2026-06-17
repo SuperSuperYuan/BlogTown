@@ -200,3 +200,19 @@ def test_load_graph_identical_embeddings_stay_on_sphere(tmp_path):
     for n in g["nodes"]:
         norm = math.sqrt(n["x"] ** 2 + n["y"] ** 2 + n["z"] ** 2)
         assert math.isclose(norm, 1.0, abs_tol=1e-5)
+
+
+def test_clusters_table_created(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    names = {r["name"] for r in con.execute("PRAGMA table_info(clusters)")}
+    con.close()
+    assert names == {"id", "name", "color", "signature"}
+
+
+def test_items_table_has_cluster_column(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(items)")}
+    con.close()
+    assert "cluster" in cols
