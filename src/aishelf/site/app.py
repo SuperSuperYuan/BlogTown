@@ -117,7 +117,7 @@ def _resolve_pair(items, space, *, a_id, b_id, lock_id, rng):
     """Resolve a (item_a, item_b) pair from explicit ids, else a surprising pick
     (with random fallback). Returns None when no pair can be formed."""
     by_id = {it.id: it for it in items}
-    if a_id and b_id:
+    if a_id and b_id and a_id != b_id:
         pair = (a_id, b_id)
     else:
         ids, matrix, meta = space
