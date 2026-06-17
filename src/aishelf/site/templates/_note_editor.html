@@ -39,7 +39,10 @@
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
       status.textContent = "已保存 ✓";
-      if (ta.value.trim()) { view.innerHTML = data.html; showView(); }
+      if (ta.value.trim()) {
+        view.innerHTML = data.html;
+        setTimeout(showView, 700);   // let "已保存 ✓" show briefly before switching to the rendered view
+      }
     } catch (e) {
       status.className = "note-status err";
       status.textContent = "保存失败：" + e;
