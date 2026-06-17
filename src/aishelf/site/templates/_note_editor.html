@@ -21,7 +21,12 @@
   const saveBtn = document.getElementById("note-save");
   const status = document.getElementById("note-status");
 
-  function showEdit() { view.hidden = true; editBtn.hidden = true; edit.hidden = false; ta.focus(); }
+  let viewTimer = null;
+  function showEdit() {
+    if (viewTimer) { clearTimeout(viewTimer); viewTimer = null; }  // cancel a pending swap-to-view
+    status.className = "note-status"; status.textContent = "";     // drop any stale "已保存 ✓"
+    view.hidden = true; editBtn.hidden = true; edit.hidden = false; ta.focus();
+  }
   function showView() { edit.hidden = true; view.hidden = false; editBtn.hidden = false; }
 
   editBtn.addEventListener("click", showEdit);
@@ -41,7 +46,7 @@
       status.textContent = "已保存 ✓";
       if (ta.value.trim()) {
         view.innerHTML = data.html;
-        setTimeout(showView, 700);   // let "已保存 ✓" show briefly before switching to the rendered view
+        viewTimer = setTimeout(showView, 700);   // let "已保存 ✓" show briefly before switching to the rendered view
       }
     } catch (e) {
       status.className = "note-status err";
