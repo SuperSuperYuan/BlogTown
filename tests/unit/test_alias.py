@@ -159,3 +159,34 @@ def test_generate_hooks_caps_length(monkeypatch):
     monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient(f'["{long}"]'))
     out = alias.generate_hooks([("a", "")])
     assert len(out) == 1 and len(out[0]) <= alias.HOOK_MAX_CHARS
+
+
+def test_generate_cluster_names_not_configured_returns_none(monkeypatch):
+    monkeypatch.delenv("ATLAS_CHAT_BASE_URL", raising=False)
+    monkeypatch.delenv("ATLAS_CHAT_MODEL", raising=False)
+    assert alias.generate_cluster_names([["t1", "t2"]]) is None
+
+
+def test_generate_cluster_names_parses_json_array(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient('["智能体", "检索增强"]'))
+    out = alias.generate_cluster_names([["Agent 入门", "多智能体"], ["RAG 综述", "向量检索"]])
+    assert out == ["智能体", "检索增强"]
+
+
+def test_generate_cluster_names_empty_returns_none(monkeypatch):
+    _configure(monkeypatch)
+    assert alias.generate_cluster_names([]) is None
+
+
+def test_generate_cluster_names_wrong_length_returns_none(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient('["仅一个"]'))
+    assert alias.generate_cluster_names([["a"], ["b"]]) is None
+
+
+def test_generate_cluster_names_caps_length(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.setattr(alias, "get_client", lambda s: _FakeClient('["一二三四五六七八九十"]'))
+    out = alias.generate_cluster_names([["a"]])
+    assert len(out) == 1 and len(out[0]) <= alias.CLUSTER_NAME_MAX_CHARS

@@ -33,6 +33,14 @@ _HOOK_PROMPT = (
     "元素顺序与输入编号一致，不要输出任何额外文字或解释。\n\n"
 )
 
+CLUSTER_NAME_MAX_CHARS = 8  # safety cap; the prompt asks for <= 6 Chinese chars
+
+_CLUSTER_PROMPT = (
+    "下面每一行是一个主题簇下的若干内容标题。请为每个簇起一个不超过6个汉字的"
+    "中文主题名，要能概括该簇的共同主题、尽量短。只返回一个 JSON 字符串数组，"
+    "元素顺序与输入编号一致，不要输出任何额外文字或解释。\n\n"
+)
+
 
 def get_alias_settings() -> dict[str, str] | None:
     base = os.environ.get("ATLAS_CHAT_BASE_URL")
@@ -102,3 +110,10 @@ def generate_aliases(pairs: list[tuple[str, str]]) -> list[str] | None:
 def generate_hooks(pairs: list[tuple[str, str]]) -> list[str] | None:
     """One-sentence "why watch" hooks (≤30 chars) for (title, summary) pairs."""
     return _generate_strings(_HOOK_PROMPT, pairs, HOOK_MAX_CHARS)
+
+
+def generate_cluster_names(clusters: list[list[str]]) -> list[str] | None:
+    """≤6-char Chinese theme names for clusters, each given as its representative
+    titles. Reuses the batched core; None when unconfigured/empty/error/mismatch."""
+    pairs = [("、".join(titles[:6]), "") for titles in clusters]
+    return _generate_strings(_CLUSTER_PROMPT, pairs, CLUSTER_NAME_MAX_CHARS)
