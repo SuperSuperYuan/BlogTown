@@ -24,9 +24,10 @@ def test_api_graph_shape(client):
     r = client.get("/api/graph")
     assert r.status_code == 200
     body = r.json()
-    assert set(body.keys()) == {"nodes", "edges"}
+    assert set(body.keys()) == {"nodes", "edges", "clusters"}
     assert any(n["id"] == "v1" and n["type"] == "video" and "degree" in n for n in body["nodes"])
     assert body["edges"] == []     # no embeddings configured in tests -> no edges
+    assert body["clusters"] == []  # no embeddings -> no clusters
 
 
 def test_graph_page_renders(client):
@@ -41,3 +42,8 @@ def test_graph_page_renders(client):
 def test_nav_has_graph_link(client):
     r = client.get("/")
     assert 'href="/graph"' in r.text
+
+
+def test_api_graph_payload_has_clusters_list(client):
+    body = client.get("/api/graph").json()
+    assert "clusters" in body and isinstance(body["clusters"], list)
