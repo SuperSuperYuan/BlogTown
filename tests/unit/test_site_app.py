@@ -230,3 +230,46 @@ def test_videos_page_renders_without_hook(tmp_path, monkeypatch):
     r = client.get("/videos")
     assert r.status_code == 200
     assert "无钩子视频" in r.text
+
+
+import json as _dj
+from fastapi.testclient import TestClient as _DClient
+
+
+def _seed_one_video(tmp_path, vid="v1", title="速读测试视频", collected="2026-06-10T00:00:00"):
+    rec = {"id": vid, "type": "video", "title": title, "author": "作者甲",
+           "platform": "youtube", "source_url": f"https://x/{vid}",
+           "published_at": "2024-01-01", "summary": "摘要", "keywords": [],
+           "collected_at": collected, "thumbnail_url": "https://img/x.jpg"}
+    (tmp_path / "videos").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "videos" / f"{vid}.json").write_text(_dj.dumps(rec, ensure_ascii=False), encoding="utf-8")
+
+
+def test_home_shows_digest_card_with_hook(tmp_path, monkeypatch):
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AISHELF_DB_PATH", str(tmp_path / "atlas.db"))
+    _seed_one_video(tmp_path)
+    from aishelf.db.sync import sync
+    from aishelf.db import schema
+    sync(tmp_path, tmp_path / "atlas.db")
+    con = schema.connect(tmp_path / "atlas.db")
+    con.execute("UPDATE items SET hook=? WHERE id=?", ("速读钩子", "v1"))
+    con.commit()
+    con.close()
+    from aishelf.site.app import app
+    r = _DClient(app).get("/")
+    assert r.status_code == 200
+    assert "今日速读" in r.text
+    assert "速读测试视频" in r.text
+    assert "速读钩子" in r.text
+
+
+def test_home_digest_absent_when_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AISHELF_DB_PATH", str(tmp_path / "atlas.db"))
+    from aishelf.db.sync import sync
+    sync(tmp_path, tmp_path / "atlas.db")   # no items
+    from aishelf.site.app import app
+    r = _DClient(app).get("/")
+    assert r.status_code == 200
+    assert "今日速读" not in r.text

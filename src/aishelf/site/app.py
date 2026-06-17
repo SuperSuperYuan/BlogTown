@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -39,6 +40,7 @@ from aishelf.site import (
     schedules,
     views,
 )
+from aishelf.site import digest as digest_mod
 from aishelf.site.config import get_data_dir
 
 logger = logging.getLogger(__name__)
@@ -173,12 +175,14 @@ async def not_found_handler(request: Request, exc):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     items = _items()
+    hooks = _hooks_for(items)            # one call; superset map reused below
     vids = views.videos(items)[:HOME_PREVIEW]
     blogs = views.blogs(items)[:HOME_PREVIEW]
+    daily = digest_mod.build_digest(items, hooks, today=date.today().isoformat())
     return templates.TemplateResponse(
         request,
         "home.html",
-        {"videos": vids, "blogs": blogs, "hooks": _hooks_for(vids + blogs)},
+        {"videos": vids, "blogs": blogs, "hooks": hooks, "digest": daily},
     )
 
 
