@@ -87,3 +87,48 @@ def representatives(labels, matrix, ids, *, m: int = 6) -> dict[int, list[str]]:
         order = idx[np.argsort(-(members @ centroid))][:m]
         out[c] = [ids[i] for i in order]
     return out
+
+
+def _signature(ids: list[str]) -> str:
+    return hashlib.sha1("\x00".join(sorted(ids)).encode("utf-8")).hexdigest()
+
+
+def recompute_clusters(con, *, seed: int = CLUSTER_SEED) -> dict[int, list[str]]:
+    """Recompute global clusters from stored embeddings; rewrite items.cluster and
+    the clusters table. A cluster's name is carried over when its exact member set
+    (signature) is unchanged, so only genuinely new/changed clusters need (LLM)
+    naming. Returns {cluster_id: [representative titles]} for clusters that still
+    need a name — empty when there are no embeddings."""
+    groups = graph._load_groups(con)
+    prev_names = {
+        r["signature"]: r["name"]
+        for r in con.execute("SELECT signature, name FROM clusters")
+        if r["signature"] and r["name"]
+    }
+    con.execute("UPDATE items SET cluster = NULL")
+    con.execute("DELETE FROM clusters")
+    if not groups:
+        return {}
+    dim = max(groups, key=lambda d: len(groups[d][0]))
+    ids, mat = groups[dim]
+    labels = kmeans(mat, choose_k(len(ids)), seed=seed)
+    reps = representatives(labels, mat, ids)
+
+    members: dict[int, list[str]] = {}
+    for sid, lab in zip(ids, labels):
+        con.execute("UPDATE items SET cluster = ? WHERE id = ?", (int(lab), sid))
+        members.setdefault(int(lab), []).append(sid)
+
+    title_of = {r["id"]: r["title"]
+                for r in con.execute("SELECT id, title FROM items WHERE cluster IS NOT NULL")}
+    need: dict[int, list[str]] = {}
+    for cid in sorted(members):
+        sig = _signature(members[cid])
+        name = prev_names.get(sig)
+        con.execute(
+            "INSERT INTO clusters (id, name, color, signature) VALUES (?,?,?,?)",
+            (cid, name, color_for(cid), sig),
+        )
+        if not name:
+            need[cid] = [title_of[i] for i in reps.get(cid, []) if i in title_of]
+    return need
