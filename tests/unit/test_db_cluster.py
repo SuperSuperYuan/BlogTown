@@ -46,3 +46,21 @@ def test_kmeans_clamps_k_to_n():
     mat = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
     labels = cluster.kmeans(mat, 5, seed=1)
     assert len(labels) == 2 and set(int(x) for x in labels) <= {0, 1}
+
+
+def test_representatives_groups_by_label_nearest_first():
+    ids = ["a", "b", "c"]
+    mat = np.array([[1.0, 0.0], [0.98, 0.2], [0.0, 1.0]], dtype=np.float32)
+    labels = np.array([0, 0, 1])
+    out = cluster.representatives(labels, mat, ids)
+    assert set(out) == {0, 1}
+    assert set(out[0]) == {"a", "b"}
+    assert out[1] == ["c"]
+
+
+def test_representatives_caps_to_m():
+    ids = [f"i{n}" for n in range(10)]
+    mat = np.tile(np.array([1.0, 0.0], dtype=np.float32), (10, 1))
+    labels = np.zeros(10, dtype=int)
+    out = cluster.representatives(labels, mat, ids, m=3)
+    assert len(out[0]) == 3

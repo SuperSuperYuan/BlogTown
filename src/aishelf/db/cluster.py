@@ -69,3 +69,21 @@ def kmeans(matrix, k: int, *, seed: int, iters: int = 50):
             else:
                 centroids[c] = x[rng.integers(n)]
     return labels
+
+
+def representatives(labels, matrix, ids, *, m: int = 6) -> dict[int, list[str]]:
+    """{cluster_id: [ids]} — up to m ids per cluster, nearest the cluster centroid
+    first (cosine on L2-normalized vectors)."""
+    x = _normalize(np.asarray(matrix, dtype=np.float32))
+    labels = np.asarray(labels)
+    out: dict[int, list[str]] = {}
+    for c in sorted({int(v) for v in labels}):
+        idx = np.where(labels == c)[0]
+        members = x[idx]
+        centroid = members.mean(axis=0)
+        nc = float(np.linalg.norm(centroid))
+        if nc > 1e-12:
+            centroid = centroid / nc
+        order = idx[np.argsort(-(members @ centroid))][:m]
+        out[c] = [ids[i] for i in order]
+    return out
