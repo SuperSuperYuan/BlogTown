@@ -412,6 +412,11 @@ def ask_chat(req: _ChatRequest):
     return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
+@app.get("/collide", response_class=HTMLResponse)
+def collide_page(request: Request):
+    return templates.TemplateResponse(request, "collide.html", {})
+
+
 @app.post("/collide/chat")
 def collide_chat(req: _CollideRequest):
     # Ungated: synthesis is cheap (like /ask), not the costly Hermes path.

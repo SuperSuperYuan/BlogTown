@@ -80,3 +80,10 @@ def test_collide_chat_empty_library(monkeypatch, tmp_path):
     client = TestClient(app)
     evs = _events(client.post("/collide/chat", json={}).text)
     assert any("先去采集" in (e.get("error") or "") for e in evs)
+
+
+def test_collide_page_renders(client):
+    r = client.get("/collide")
+    assert r.status_code == 200
+    assert "灵感碰撞" in r.text
+    assert "/collide/chat" in r.text  # the page wires up the streaming endpoint

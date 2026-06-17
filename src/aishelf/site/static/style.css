@@ -204,3 +204,17 @@ main:has(.write) { max-width: 1280px; }
 .post-body th, .post-body td { border: 1px solid #e4e7eb; padding: 6px 12px; }
 .hook { margin: 4px 0 0; padding-left: 8px; border-left: 3px solid #0a84ff; color: #3e4c59; font-size: 13px; line-height: 1.45; }
 .card .hook { display: block; padding: 4px 10px 8px; border-left: none; color: #0a84ff; font-size: 12px; }
+.collide .hint { font-size: 13px; color: #7b8794; font-weight: normal; }
+.collide-pair { display: flex; align-items: stretch; gap: 12px; margin: 12px 0; }
+.collide-pair .cc { flex: 1; position: relative; background: #fff; border: 1px solid #e7e9ef; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.collide-pair .cc.locked { border-color: #0a84ff; box-shadow: 0 0 0 2px rgba(10,132,255,.18); }
+.collide-pair .cc-type { font-size: 12px; color: #7b8794; }
+.collide-pair .cc-title { display: block; margin: 4px 0; font-weight: 600; color: #1f2933; text-decoration: none; }
+.collide-pair .cc-title:hover { color: #0a84ff; }
+.collide-pair .cc-author { font-size: 12px; color: #7b8794; }
+.collide-pair .lock { position: absolute; top: 8px; right: 8px; border: none; background: none; cursor: pointer; font-size: 15px; line-height: 1; }
+.collide-x { align-self: center; color: #0a84ff; font-size: 22px; }
+.collide-controls { margin: 6px 0 14px; }
+.collide-controls button { background: #0a84ff; color: #fff; border: none; border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+.collide-controls button:disabled { opacity: .5; cursor: default; }
+.collide-result { white-space: pre-wrap; line-height: 1.7; color: #1f2933; background: #fafbfc; border: 1px solid #e7e9ef; border-radius: 12px; padding: 16px; min-height: 60px; }

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="collide">
+  <h2>灵感碰撞 <span class="hint">两条内容，碰出一个新想法</span></h2>
+  <div class="collide-pair" id="pair"></div>
+  <div class="collide-controls"><button id="again" type="button">再来一对 ↻</button></div>
+  <div class="collide-result" id="result"></div>
+</section>
+<script>
+(function () {
+  const pairEl = document.getElementById('pair');
+  const resultEl = document.getElementById('result');
+  const againBtn = document.getElementById('again');
+  let lockId = null, busy = false;
+
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+  function cardHtml(item) {
+    const href = (item.type === 'video' ? '/videos/' : '/blogs/') + encodeURIComponent(item.id);
+    const locked = lockId === item.id;
+    return '<div class="cc ' + (locked ? 'locked' : '') + '" data-id="' + escapeHtml(item.id) + '">'
+      + '<button class="lock" type="button" title="锁定后只换另一边">' + (locked ? '🔒' : '🔓') + '</button>'
+      + '<span class="cc-type">' + (item.type === 'video' ? '视频' : '博客') + '</span>'
+      + '<a class="cc-title" href="' + href + '">' + escapeHtml(item.title) + '</a>'
+      + '<div class="cc-author">' + escapeHtml(item.author || '') + '</div></div>';
+  }
+
+  function renderPair(p) {
+    pairEl.innerHTML = cardHtml(p.a) + '<div class="collide-x">✦</div>' + cardHtml(p.b);
+    pairEl.querySelectorAll('.cc').forEach(card => {
+      card.querySelector('.lock').addEventListener('click', () => {
+        const id = card.getAttribute('data-id');
+        lockId = (lockId === id) ? null : id;
+        pairEl.querySelectorAll('.cc').forEach(c => {
+          const on = c.getAttribute('data-id') === lockId;
+          c.classList.toggle('locked', on);
+          c.querySelector('.lock').textContent = on ? '🔒' : '🔓';
+        });
+      });
+    });
+  }
+
+  async function run() {
+    if (busy) return;
+    busy = true; againBtn.disabled = true; resultEl.textContent = '正在碰撞…';
+    let resp;
+    try {
+      resp = await fetch('/collide/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lockId ? { lock_id: lockId } : {}),
+      });
+    } catch (e) { resultEl.textContent = '⚠️ 无法连接服务'; busy = false; againBtn.disabled = false; return; }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', acc = '', streaming = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let p; try { p = JSON.parse(line.slice(6)); } catch (e) { continue; }
+        if (p.pair) { renderPair(p.pair); }
+        else if (p.delta) { if (!streaming) { streaming = true; acc = ''; } acc += p.delta; resultEl.textContent = acc; }
+        else if (p.error) { resultEl.textContent = '⚠️ ' + p.error; }
+      }
+    }
+    busy = false; againBtn.disabled = false;
+  }
+
+  againBtn.addEventListener('click', run);
+  run();
+})();
+</script>
+{% endblock %}
