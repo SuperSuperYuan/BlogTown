@@ -50,3 +50,36 @@ def build_messages(galaxy_name: str, items: list[dict]) -> list[dict]:
     listing = "\n".join(_fmt_item(i + 1, it) for i, it in enumerate(items))
     user = f"主题星系：{galaxy_name}\n这个星系里的内容：\n{listing}"
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def load_galaxies(db_path) -> list:
+    """All theme galaxies (each with its items), sorted by size desc. Returns []
+    when there are no clustered items / the DB is missing. Tolerant of a
+    missing/old DB (returns [], never raises) — like mirror.load_profile."""
+    try:
+        con = schema.connect(db_path)
+        try:
+            schema.init_db(con)
+            clusters = {
+                r["id"]: (r["name"] or "", r["color"] or "")
+                for r in con.execute("SELECT id, name, color FROM clusters")
+            }
+            rows = con.execute(
+                "SELECT id, type, title, summary, cluster "
+                "FROM items WHERE cluster IS NOT NULL"
+            ).fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return []
+    by_cluster: dict[int, list] = {}
+    for r in rows:
+        by_cluster.setdefault(r["cluster"], []).append(r)
+    galaxies = []
+    for cid, members in by_cluster.items():
+        name, color = clusters.get(cid, ("", ""))
+        items = [Item(id=m["id"], title=m["title"], summary=m["summary"], type=m["type"])
+                 for m in members]
+        galaxies.append(Galaxy(id=cid, name=name, color=color, size=len(items), items=items))
+    galaxies.sort(key=lambda g: (-g.size, g.name))
+    return galaxies
