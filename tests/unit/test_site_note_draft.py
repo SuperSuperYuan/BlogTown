@@ -71,3 +71,10 @@ def test_note_draft_unknown_id_404(client):
 
 def test_note_draft_unsafe_id_404(client):
     assert client.post("/notes/a..b/draft").status_code == 404
+
+
+def test_editor_has_draft_button_and_endpoint(client):
+    r = client.get("/videos/youtube-aaa")
+    assert r.status_code == 200
+    assert "AI 起草" in r.text
+    assert "/draft" in r.text

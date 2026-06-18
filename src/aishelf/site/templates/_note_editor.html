@@ -8,6 +8,7 @@
     <textarea id="note" class="note-input" placeholder="写点笔记…（支持 Markdown）">{{ note }}</textarea>
     <div class="note-bar">
       <button id="note-save" type="button" class="btn">保存笔记</button>
+      <button id="note-draft" type="button" class="btn-link">✨ AI 起草</button>
       <span id="note-status" class="note-status"></span>
     </div>
   </div>
@@ -53,6 +54,41 @@
       status.textContent = "保存失败：" + e;
     } finally {
       saveBtn.disabled = false;
+    }
+  });
+  const draftBtn = document.getElementById("note-draft");
+  let drafting = false;
+  draftBtn.addEventListener("click", async () => {
+    if (drafting) return;
+    drafting = true; draftBtn.disabled = true;
+    status.className = "note-status"; status.textContent = "正在起草…";
+    const base = ta.value.trim() ? ta.value.replace(/\s+$/, "") + "\n\n" : "";
+    let resp;
+    try {
+      resp = await fetch("/notes/{{ item.id }}/draft", { method: "POST" });
+    } catch (e) {
+      status.className = "note-status err"; status.textContent = "起草失败：" + e;
+      drafting = false; draftBtn.disabled = false; return;
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", acc = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n"); buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          let p; try { p = JSON.parse(line.slice(6)); } catch (e) { continue; }
+          if (p.delta) { acc += p.delta; ta.value = base + acc; }
+          else if (p.error) { status.className = "note-status err"; status.textContent = "⚠️ " + p.error; }
+        }
+      }
+      if (acc && status.textContent === "正在起草…") { status.textContent = "草稿已生成，编辑后保存"; }
+    } finally {
+      drafting = false; draftBtn.disabled = false;
     }
   });
 })();
