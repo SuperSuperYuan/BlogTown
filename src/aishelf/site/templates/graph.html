@@ -16,9 +16,19 @@
   </div>
   <div id="globe" class="globe-canvas"></div>
   <div class="verb-pill" id="verbPill">
-    <button type="button" disabled title="即将上线">▶ 回放</button>
-    <button type="button" disabled title="即将上线">🛸 逛逛</button>
-    <button type="button" disabled title="即将上线">🔗 路径</button>
+    <button type="button" data-mode="replay">▶ 回放</button>
+    <button type="button" data-mode="tour">🛸 逛逛</button>
+    <button type="button" data-mode="path">🔗 路径</button>
+  </div>
+  <div class="replay-bar" id="replayBar">
+    <span class="play" id="replayPlay">⏸</span>
+    <input type="range" id="replayRange" min="0" max="1000" value="1000" />
+    <span class="date" id="replayDate"></span>
+  </div>
+  <div class="tour-cap" id="tourCap"></div>
+  <div class="path-panel" id="pathPanel">
+    <div class="path-hint" id="pathHint">点两颗星，看它们怎么连起来</div>
+    <div class="path-text" id="pathText"></div>
   </div>
   <div id="globeTip" class="globe-tip" hidden></div>
   <div id="globeEmpty" class="globe-empty" hidden>
@@ -54,7 +64,30 @@
                display: flex; gap: 6px; background: rgba(10,15,30,.85); border: 1px solid #24365f;
                border-radius: 999px; padding: 5px 7px; z-index: 3; }
   .verb-pill button { border: none; background: transparent; color: #bcd4ff; font-size: 13px;
-                      padding: 4px 12px; border-radius: 999px; cursor: not-allowed; opacity: .5; }
+                      padding: 4px 12px; border-radius: 999px; cursor: pointer; opacity: .85; }
+  .verb-pill button:disabled { cursor: not-allowed; opacity: .4; }
+  .verb-pill button.on { background: #16263f; color: #fff; opacity: 1; }
+  .replay-bar { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+    display: none; align-items: center; gap: 10px; background: rgba(10,15,30,.9);
+    border: 1px solid #24365f; border-radius: 999px; padding: 6px 14px; z-index: 3;
+    color: #cdd8ef; font-size: 12px; }
+  .replay-bar.show { display: flex; }
+  .replay-bar input[type=range] { width: 220px; }
+  .replay-bar .play { cursor: pointer; width: 26px; text-align: center; user-select: none; }
+  .replay-bar .date { min-width: 88px; font-variant-numeric: tabular-nums; }
+  .tour-cap { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+    display: none; max-width: 60%; text-align: center; background: rgba(10,15,30,.9);
+    border: 1px solid #24365f; border-radius: 12px; padding: 10px 16px; z-index: 3;
+    color: #e7eefb; font-size: 14px; line-height: 1.6; }
+  .tour-cap.show { display: block; }
+  .tour-cap b { color: #9fc6ff; }
+  .path-panel { position: absolute; right: 16px; top: 68px; width: 300px; max-height: 60%;
+    display: none; flex-direction: column; gap: 8px; background: rgba(8,14,28,.94);
+    border: 1px solid #24365f; border-radius: 12px; padding: 12px 14px; z-index: 3;
+    color: #e7eefb; font-size: 13px; line-height: 1.7; overflow: auto; }
+  .path-panel.show { display: flex; }
+  .path-hint { color: #9fb0d4; font-size: 12px; }
+  .path-text { white-space: pre-wrap; }
 </style>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -196,10 +229,11 @@
       hovered = null;
       tip.hidden = true;
       renderer.domElement.style.cursor = 'grab';
-      controls.autoRotate = true;
+      if (!currentMode) controls.autoRotate = true;   // a mode owns autoRotate while active
     }
   });
   renderer.domElement.addEventListener('click', () => {
+    if (currentMode === 'path') return;   // path mode owns clicks (star picking)
     if (hovered && hovered.userData.href) window.open(hovered.userData.href, '_blank', 'noopener');
   });
 
@@ -256,6 +290,246 @@
     }
   });
 
+  // ---- shared world positions + adjacency (used by tour / path) ----
+  const posOf = {};
+  for (const n of data.nodes) posOf[n.id] = new THREE.Vector3(n.x * R, n.y * R, n.z * R);
+  const adj = {};
+  for (const e of (data.edges || [])) {
+    (adj[e.source] || (adj[e.source] = [])).push({ id: e.target, w: e.weight });
+    (adj[e.target] || (adj[e.target] = [])).push({ id: e.source, w: e.weight });
+  }
+  const meshOf = {};
+  for (const m of nodeMeshes) meshOf[m.userData.id] = m;
+
+  // ---- mode manager: at most one active verb; leaving restores the rest state ----
+  let frameHook = null, exitMode = null, currentMode = null;
+  const MODES = {};
+  function restoreAll() {
+    for (const m of nodeMeshes) {
+      m.visible = true; m.material.opacity = 1;
+      if (m.userData._label) { m.userData._label.visible = true; m.userData._label.element.style.opacity = '1'; }
+    }
+  }
+  function leaveMode() {
+    if (exitMode) { try { exitMode(); } catch (e) {} }
+    exitMode = null; frameHook = null; currentMode = null;
+    document.querySelectorAll('#verbPill button').forEach((b) => b.classList.remove('on'));
+    restoreAll();
+    // reset the resting filters so the chrome agrees with the now-full graph
+    document.querySelectorAll('#globeFilters button').forEach((x) => x.classList.toggle('on', x.dataset.f === 'all'));
+    document.querySelectorAll('#globeLegend button').forEach((x) => x.classList.remove('off'));
+    legendActive = null;
+    document.getElementById('globeSearch').value = '';
+    controls.autoRotate = true;
+  }
+  function setMode(name) {
+    if (currentMode === name) { leaveMode(); return; }   // toggle off
+    leaveMode();
+    currentMode = name;
+    document.querySelectorAll('#verbPill button').forEach((b) => b.classList.toggle('on', b.dataset.mode === name));
+    controls.autoRotate = false;
+    exitMode = MODES[name] ? (MODES[name]() || null) : null;
+  }
+  document.getElementById('verbPill').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.mode) setMode(b.dataset.mode);
+  });
+
+  // ---- B 时间回放 ----
+  MODES.replay = function () {
+    const bar = document.getElementById('replayBar');
+    const range = document.getElementById('replayRange');
+    const playBtn = document.getElementById('replayPlay');
+    const dateEl = document.getElementById('replayDate');
+    const times = data.nodes.map((n) => Date.parse(n.collected_at) || 0);
+    const tmin = Math.min(...times), tmax = Math.max(...times) || (tmin + 1);
+    const span = (tmax - tmin) || 1;
+    const DURATION = 18000;          // ms for a full sweep
+    let p = 0, playing = true, last = performance.now();
+
+    function applyAt(pp) {
+      const cutoff = tmin + pp * span;
+      for (const m of nodeMeshes) {
+        const t = Date.parse(m.userData.collected_at) || 0;
+        const born = t <= cutoff;
+        const fade = born ? Math.min(1, (cutoff - t) / (span * 0.04 + 1)) : 0;
+        m.visible = born;
+        m.material.opacity = born ? Math.max(0.2, fade) : 0;
+        if (m.userData._label) {
+          m.userData._label.visible = born;
+          m.userData._label.element.style.opacity = born ? String(Math.max(0.2, fade)) : '0';
+        }
+      }
+      dateEl.textContent = new Date(cutoff).toISOString().slice(0, 10);
+      range.value = String(Math.round(pp * 1000));
+    }
+
+    bar.classList.add('show');
+    frameHook = function () {
+      if (playing) {
+        const now = performance.now();
+        p += (now - last) / DURATION; last = now;
+        if (p >= 1) { p = 1; playing = false; playBtn.textContent = '▶'; }
+        applyAt(p);
+      } else { last = performance.now(); }
+    };
+    playBtn.onclick = function () {
+      if (p >= 1) p = 0;             // restart from the beginning
+      playing = !playing; playBtn.textContent = playing ? '⏸' : '▶';
+      last = performance.now();
+    };
+    range.oninput = function () {
+      playing = false; playBtn.textContent = '▶';
+      p = Number(range.value) / 1000; applyAt(p);
+    };
+    applyAt(0);
+    return function exit() {
+      bar.classList.remove('show');
+      playBtn.onclick = null; range.oninput = null;
+    };
+  };
+
+  // ---- D 语义漫游 ----
+  MODES.tour = function () {
+    const cap = document.getElementById('tourCap');
+    const ids = data.nodes.map((n) => n.id);
+    const visited = new Set();
+    const HOLD = 3000;            // ms dwell per node
+    let cur = ids[Math.floor(Math.random() * ids.length)] || null;
+    let hold = HOLD, last = performance.now(), lastCluster = null;
+    const target = new THREE.Vector3();
+    cap.classList.add('show');
+
+    function clusterName(cid) {
+      const c = (data.clusters || []).find((x) => x.id === cid);
+      return c ? c.name : '';
+    }
+    function go(id) {
+      if (!id || !meshOf[id]) return;
+      visited.add(id); cur = id;
+      const n = meshOf[id].userData;
+      let html = '';
+      const cn = clusterName(n.cluster);
+      if (cn && n.cluster !== lastCluster) { html += '进入「<b>' + cn + '</b>」　'; lastCluster = n.cluster; }
+      html += '<b>' + (n.alias || n.title) + '</b>';
+      if (n.hook) html += '<br>' + n.hook;
+      cap.innerHTML = html;
+      const keep = new Set([id, ...((adj[id] || []).map((e) => e.id))]);
+      for (const m of nodeMeshes) {
+        const on = keep.has(m.userData.id);
+        m.material.opacity = on ? 1 : 0.12;
+        if (m.userData._label) m.userData._label.element.style.opacity = on ? '1' : '0.12';
+      }
+    }
+    function next() {
+      const nbrs = (adj[cur] || []).map((e) => e.id);
+      const fresh = nbrs.filter((i) => !visited.has(i));
+      const pool = fresh.length ? fresh : nbrs;
+      if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+      const rest = ids.filter((i) => !visited.has(i));   // dead end -> jump
+      return (rest.length ? rest : ids)[Math.floor(Math.random() * (rest.length ? rest.length : ids.length))];
+    }
+
+    go(cur);
+    frameHook = function () {
+      const now = performance.now(); const dt = now - last; last = now;
+      const p = posOf[cur];
+      if (p) {
+        controls.target.lerp(p, 0.05);
+        target.copy(p).normalize().multiplyScalar(R * 2.3);
+        camera.position.lerp(target, 0.03);
+      }
+      hold -= dt;
+      if (hold <= 0) { hold = HOLD; go(next()); }
+    };
+    return function exit() { cap.classList.remove('show'); controls.target.set(0, 0, 0); };
+  };
+
+  // ---- E 语义路径 ----
+  MODES.path = function () {
+    const panel = document.getElementById('pathPanel');
+    const hint = document.getElementById('pathHint');
+    const text = document.getElementById('pathText');
+    panel.classList.add('show'); hint.textContent = '点第一颗星'; text.textContent = '';
+    let a = null, lineObj = null;
+
+    function dijkstra(src, dst) {
+      const dist = { [src]: 0 }, prev = {}, seen = new Set();
+      const pq = [[0, src]];
+      while (pq.length) {
+        pq.sort((x, y) => x[0] - y[0]);
+        const [d, u] = pq.shift();
+        if (u === dst) break;
+        if (seen.has(u)) continue; seen.add(u);
+        for (const e of (adj[u] || [])) {
+          const nd = d + (1 - e.w);          // stronger edge (higher w) = shorter
+          if (dist[e.id] == null || nd < dist[e.id]) { dist[e.id] = nd; prev[e.id] = u; pq.push([nd, e.id]); }
+        }
+      }
+      if (dst !== src && prev[dst] == null) return null;
+      const route = [dst]; let c = dst;
+      while (c !== src) { c = prev[c]; if (c == null) return null; route.unshift(c); }
+      return route;
+    }
+    function clearLine() {
+      if (lineObj) { scene.remove(lineObj); lineObj.geometry.dispose(); lineObj.material.dispose(); lineObj = null; }
+    }
+    function drawRoute(route) {
+      clearLine();
+      const pts = route.map((id) => posOf[id]).filter(Boolean);
+      lineObj = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0x6cf0ff, transparent: true, opacity: 0.9 }));
+      scene.add(lineObj);
+      const keep = new Set(route);
+      for (const m of nodeMeshes) {
+        const on = keep.has(m.userData.id);
+        m.material.opacity = on ? 1 : 0.08;
+        if (m.userData._label) m.userData._label.element.style.opacity = on ? '1' : '0.08';
+      }
+    }
+    async function explain(route) {
+      try {
+        const resp = await fetch('/graph/path', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: route }),
+        });
+        const reader = resp.body.getReader(), dec = new TextDecoder();
+        let buf = ''; text.textContent = '';
+        while (true) {
+          const { done, value } = await reader.read(); if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n'); buf = lines.pop();
+          for (const ln of lines) {
+            if (!ln.startsWith('data: ')) continue;
+            const ev = JSON.parse(ln.slice(6));
+            if (ev.delta) text.textContent += ev.delta;
+            if (ev.error) text.textContent = ev.error;
+          }
+        }
+      } catch (e) { text.textContent = '解说服务暂时不可用'; }
+    }
+    function onPick(ev) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      ray.setFromCamera(mouse, camera);
+      const hit = ray.intersectObjects(nodeMeshes.filter((m) => m.material.opacity > 0.5))[0];
+      if (!hit) return;
+      const id = hit.object.userData.id;
+      if (a == null) { a = id; hint.textContent = '已选起点，再点一颗终点星'; return; }
+      if (id === a) return;
+      const route = dijkstra(a, id);
+      if (!route) { hint.textContent = '这两颗星之间暂无语义通路，换一对试试'; a = null; return; }
+      hint.textContent = '路径：' + route.length + ' 颗星 · 解说中…';
+      drawRoute(route); explain(route); a = null;
+    }
+    renderer.domElement.addEventListener('click', onPick);
+    return function exit() {
+      panel.classList.remove('show'); clearLine();
+      renderer.domElement.removeEventListener('click', onPick);
+    };
+  };
+
   function resize() {
     camera.aspect = W() / H(); camera.updateProjectionMatrix();
     renderer.setSize(W(), H()); labelRenderer.setSize(W(), H());
@@ -264,6 +538,7 @@
 
   (function animate() {
     requestAnimationFrame(animate);
+    if (frameHook) frameHook();
     controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);

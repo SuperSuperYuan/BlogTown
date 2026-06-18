@@ -84,6 +84,9 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `build_messages`; surfaced by `GET /collide` + `POST /collide/chat`, which
   emits the chosen pair then streams a three-part 中文 synthesis via
   `llm.stream_completion`; on-demand, no persistence, reuses `ATLAS_CHAT_*`/`ATLAS_EMBED_*`),
+  `path.py` (语义路径: pure `build_messages` — given the ordered items on a graph
+  path, phrases a 中文 explanation of the conceptual bridge; mirrors collide.py's
+  pure half; streamed by `POST /graph/path` via `llm.stream_completion`),
   `digest.py` (今日速读: pure `build_digest` — recent items sorted by `collected_at` + one
   date-seeded older "gem" via `random.Random(today)`, each carrying its A-hook; no LLM/cache;
   rendered as a 今日速读 card at the top of `GET /`),
@@ -165,8 +168,13 @@ knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
 surface by PCA of embeddings, colored by theme galaxy with floating galaxy labels
   + a color legend, glowing arcs for edges, alias labels; OrbitControls
 drag-rotate + scroll-zoom + auto-rotate; hover, click, type filter, search
-highlight; a disabled 回放/漫游/路径 verb-pill is the Phase-2 placeholder);
-  `GET /api/graph` serves the raw `{nodes, edges, clusters}` JSON.
+highlight; a bottom verb-pill drives three transient modes over the rest state —
+  B 时间回放 (nodes fade in by `collected_at` with a scrubber), D 语义漫游 (camera
+  auto-tours the edge graph with hook narration + 跨星系 announcements), and E 语义路径
+  (pick two stars → client-side Dijkstra over `data.edges` → a drawn glowing path
+  line → streamed 中文 explanation));
+  `GET /api/graph` serves the raw `{nodes, edges, clusters}` JSON;
+  `POST /graph/path` streams the path explanation for E.
 `GET /collide` renders the 灵感碰撞 page; `POST /collide/chat` picks a
 surprising pair (embedding cosine mid-band) and streams a three-part 中文 synthesis. Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
