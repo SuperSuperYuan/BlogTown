@@ -297,8 +297,8 @@
     const box = document.getElementById('globeLegend');
     for (const c of (data.clusters || [])) {
       const b = document.createElement('button');
-      b.innerHTML = '<span class="sw" style="background:' + (c.color || '#888') + '"></span>'
-        + (c.name || ('星系 ' + c.id));
+      b.innerHTML = '<span class="sw" style="background:' + _esc(c.color || '#888') + '"></span>'
+        + _esc(c.name || ('星系 ' + c.id));
       b.addEventListener('click', () => {
         legendActive = (legendActive === c.id) ? null : c.id;
         document.querySelectorAll('#globeLegend button').forEach((x) => x.classList.remove('off'));
@@ -448,9 +448,9 @@
       const n = meshOf[id].userData;
       let html = '';
       const cn = clusterName(n.cluster);
-      if (cn && n.cluster !== lastCluster) { html += '进入「<b>' + cn + '</b>」　'; lastCluster = n.cluster; }
-      html += '<b>' + (n.alias || n.title) + '</b>';
-      if (n.hook) html += '<br>' + n.hook;
+      if (cn && n.cluster !== lastCluster) { html += '进入「<b>' + _esc(cn) + '</b>」　'; lastCluster = n.cluster; }
+      html += '<b>' + _esc(n.alias || n.title) + '</b>';
+      if (n.hook) html += '<br>' + _esc(n.hook);
       cap.innerHTML = html;
       const keep = new Set([id, ...((adj[id] || []).map((e) => e.id))]);
       for (const m of nodeMeshes) {
@@ -597,10 +597,12 @@
   function openPanel(id) {
     const n = nodeById[id];
     if (!n) return;
+    if (_panel.dataset.openId === id && _panel.classList.contains('show')) return;  // already showing it
+    _panel.dataset.openId = id;            // stamp so a stale fetch can't overwrite a newer node
     const cm = clusterMeta[n.cluster];
     document.getElementById('pHead').innerHTML =
       '<span class="np-badge">' + (n.type === 'video' ? '视频' : '博客') + '</span>'
-      + (cm ? '<span class="np-gchip"><span class="np-dot" style="background:' + cm.color + '"></span>' + _esc(cm.name) + '</span>' : '');
+      + (cm ? '<span class="np-gchip"><span class="np-dot" style="background:' + _esc(cm.color) + '"></span>' + _esc(cm.name) + '</span>' : '');
     document.getElementById('pTitle').textContent = n.title || '';
     const hk = document.getElementById('pHook');
     hk.textContent = n.hook || ''; hk.style.display = n.hook ? 'block' : 'none';
@@ -611,7 +613,7 @@
       const c = clusterMeta[nb.cluster];
       const lbl = nb.alias || (nb.title && nb.title.length > 12 ? nb.title.slice(0, 12) + '…' : nb.title || nb.id);
       return '<div class="np-nbr" data-id="' + _esc(e.id) + '"><span class="np-dot" style="background:'
-        + (c ? c.color : '#888') + '"></span>' + _esc(lbl) + '<span class="w">' + e.w.toFixed(2) + '</span></div>';
+        + _esc(c ? c.color : '#888') + '"></span>' + _esc(lbl) + '<span class="w">' + e.w.toFixed(2) + '</span></div>';
     }).join('') : '<div class="np-sum">（暂无语义相邻）</div>';
     document.getElementById('pSummary').textContent = '加载中…';
     document.getElementById('pKeywords').innerHTML = '';
@@ -625,7 +627,7 @@
     controls.autoRotate = false;
     _panel.classList.add('show');
     fetch('/api/item/' + encodeURIComponent(id)).then((r) => r.ok ? r.json() : null).then((d) => {
-      if (!d || !_panel.classList.contains('show')) return;
+      if (!d || !_panel.classList.contains('show') || _panel.dataset.openId !== id) return;  // ignore stale
       document.getElementById('pSummary').textContent = d.summary || '—';
       document.getElementById('pKeywords').innerHTML = (d.keywords || []).map((k) => '<span>' + _esc(k) + '</span>').join('');
       document.getElementById('pNote').innerHTML = d.note_html || '<span class="np-sum">（还没有笔记）</span>';
