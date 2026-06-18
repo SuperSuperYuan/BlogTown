@@ -33,6 +33,7 @@ from aishelf.site import (
     items,
     llm,
     markdown,
+    mirror,
     notes,
     path,
     posts,
@@ -109,6 +110,17 @@ def _hooks_for(items):
 
 def _collide_ref(it) -> dict:
     return {"id": it.id, "type": it.type, "title": it.title, "author": it.author}
+
+
+def _profile_payload(profile) -> dict:
+    """Compact, escapable fact strip for the /mirror page (mirrors _collide_ref)."""
+    return {
+        "galaxies": [{"name": g.name, "color": g.color, "size": g.size}
+                     for g in profile.galaxies],
+        "total": profile.total, "videos": profile.videos, "blogs": profile.blogs,
+        "span_days": profile.span_days,
+        "top_author": profile.top_authors[0][0] if profile.top_authors else "",
+    }
 
 
 def _item_dict(it) -> dict:
@@ -457,6 +469,27 @@ def collide_chat(req: _CollideRequest):
         a, b = pair
         yield hermes.sse({"pair": {"a": _collide_ref(a), "b": _collide_ref(b)}})
         yield from llm.stream_completion(collide.build_messages(_item_dict(a), _item_dict(b)))
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.get("/mirror", response_class=HTMLResponse)
+def mirror_page(request: Request):
+    return templates.TemplateResponse(request, "mirror.html", {})
+
+
+@app.post("/mirror/chat")
+def mirror_chat():
+    # Ungated: synthesis is cheap (like /ask and /collide), not the Hermes path.
+    profile = mirror.load_profile(default_db_path(get_data_dir()))
+
+    def _gen():
+        if profile is None:
+            yield hermes.sse({"error": "先采集一些内容并同步图谱，才能照镜子"})
+            yield hermes.sse({"done": True})
+            return
+        yield hermes.sse({"profile": _profile_payload(profile)})
+        yield from llm.stream_completion(mirror.build_messages(profile))
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
 

@@ -252,3 +252,26 @@ main:has(.write) { max-width: 1280px; }
 .note-view:empty { display: none; }
 .btn-link { background: none; border: none; color: #0a84ff; cursor: pointer; font-size: 13px; padding: 0; }
 .btn-link:hover { text-decoration: underline; }
+
+/* 藏书镜 / 阅读画像 */
+.mirror h2 .hint { font-size: .6em; font-weight: 400; color: #8a8f98; margin-left: .5em; }
+.mirror-facts { margin: 1rem 0; }
+.mx-pills { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .4rem; }
+.mx-pill {
+  font-size: .8rem; padding: .15rem .6rem; border-radius: 999px;
+  color: var(--c); border: 1px solid var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.mx-line { font-size: .85rem; color: #8a8f98; }
+.mirror-controls { margin: .5rem 0 1rem; }
+.mirror-controls button {
+  cursor: pointer; border-radius: 8px; border: 1px solid #3a3f4b;
+  background: #20242c; color: #e6e8eb; padding: .4rem .9rem;
+}
+.mirror-controls button:disabled { opacity: .5; cursor: default; }
+.mirror-result {
+  white-space: pre-wrap; line-height: 1.7; font-size: .95rem;
+  padding: 1rem 1.2rem; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(192,140,255,.08), rgba(76,194,255,.06));
+  border: 1px solid #2c313b;
+}

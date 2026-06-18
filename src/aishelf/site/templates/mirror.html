@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="mirror">
+  <h2>藏书镜 <span class="hint">照一照你的收藏，看看你是谁</span></h2>
+  <div class="mirror-facts" id="facts"></div>
+  <div class="mirror-controls"><button id="again" type="button">照一照 ↻</button></div>
+  <div class="mirror-result" id="result"></div>
+</section>
+<script>
+(function () {
+  const factsEl = document.getElementById('facts');
+  const resultEl = document.getElementById('result');
+  const againBtn = document.getElementById('again');
+  let busy = false;
+
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function safeColor(c) { return /^#[0-9a-fA-F]{6}$/.test(c || '') ? c : '#888'; }
+
+  function renderFacts(p) {
+    const pills = (p.galaxies || []).map(g =>
+      '<span class="mx-pill" style="--c:' + safeColor(g.color) + '">'
+      + escapeHtml(g.name || '未命名') + ' · ' + (g.size | 0) + '</span>').join('');
+    const line = (p.total | 0) + ' 条 · ' + (p.videos | 0) + ' 视频 · ' + (p.blogs | 0) + ' 博客'
+      + (p.span_days ? ' · 跨度 ' + (p.span_days | 0) + ' 天' : '')
+      + (p.top_author ? ' · 常客 ' + escapeHtml(p.top_author) : '');
+    factsEl.innerHTML = '<div class="mx-pills">' + pills + '</div><div class="mx-line">' + line + '</div>';
+  }
+
+  async function run() {
+    if (busy) return;
+    busy = true; againBtn.disabled = true; resultEl.textContent = '正在照镜子…';
+    let resp;
+    try {
+      resp = await fetch('/mirror/chat', { method: 'POST' });
+    } catch (e) { resultEl.textContent = '⚠️ 无法连接服务'; busy = false; againBtn.disabled = false; return; }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', acc = '', streaming = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let p; try { p = JSON.parse(line.slice(6)); } catch (e) { continue; }
+        if (p.profile) { renderFacts(p.profile); }
+        else if (p.delta) { if (!streaming) { streaming = true; acc = ''; resultEl.textContent = ''; } acc += p.delta; resultEl.textContent = acc; }
+        else if (p.error) { resultEl.textContent = '⚠️ ' + p.error; }
+      }
+    }
+    busy = false; againBtn.disabled = false;
+  }
+
+  againBtn.addEventListener('click', run);
+  run();
+})();
+</script>
+{% endblock %}
