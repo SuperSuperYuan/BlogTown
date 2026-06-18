@@ -75,6 +75,10 @@ Source layout uses a `src/` directory; package is `aishelf`.
   title/summary/keywords (+ any existing note) phrases a 中文 Markdown note
   skeleton 要点/为什么值得记/待探索; mirrors collide.py/mirror.py's pure half;
   streamed by `POST /notes/{id}/draft`, no persistence/new config),
+  `critique.py` (抬杠/反方视角: pure `build_messages` — from an item's metadata
+  (+ any existing note) phrases a 中文 adversarial critique 最薄弱处/反方立场/改判条件,
+  challenging the user's note too; mirrors notedraft.py's pure half; streamed by
+  `POST /critique/{id}`, no persistence/new config),
   `items.py` (`safe_id` +
   `delete_item`), `markdown.py` (render user markdown →
   sanitized HTML via markdown-it-py + nh3; never raises), `posts.py`
@@ -180,6 +184,10 @@ triggers an off-thread re-sync so the updated note is searchable immediately.
 from the item's metadata into the editor textarea via `llm.stream_completion`
 (ungated like /ask; `safe_id` guard, unknown/unsafe id → 404); the user edits and
 saves through `POST /notes/{id}` — drafts are never auto-saved.
+`POST /critique/{id}` streams an adversarial 中文 critique (最薄弱处/反方立场/改判条件)
+of the item — and of the user's note when present — via `llm.stream_completion`,
+shown in a 抬杠 panel on the detail page (shared `_critique.html` partial; ungated
+like /ask; `safe_id` guard, unknown/unsafe id → 404); never persisted.
 The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
 browse/search pages still read files. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
