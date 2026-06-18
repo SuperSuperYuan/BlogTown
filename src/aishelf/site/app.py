@@ -34,6 +34,7 @@ from aishelf.site import (
     llm,
     markdown,
     notes,
+    path,
     posts,
     schedule_state,
     scheduler,
@@ -353,6 +354,10 @@ class _CollideRequest(BaseModel):
     lock_id: str | None = None
 
 
+class _PathRequest(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+
+
 @app.get("/collect", response_class=HTMLResponse)
 def collect_page(request: Request, q: str = ""):
     return templates.TemplateResponse(
@@ -454,6 +459,26 @@ def graph_page(request: Request):
 def api_graph():
     """Read-only semantic graph (nodes + top-K-capped edges) over the derived DB."""
     return db_graph.load_graph(default_db_path(get_data_dir()))
+
+
+@app.post("/graph/path")
+def graph_path(req: _PathRequest):
+    # Ungated: explanation is cheap (like /ask and /collide), not the Hermes path.
+    if len(req.ids) < 2:
+        raise HTTPException(status_code=400, detail="需要至少两个节点")
+    hits = db_search.get_by_ids(default_db_path(get_data_dir()), req.ids)
+    ordered = [hits[i] for i in req.ids if i in hits]   # preserve client path order
+
+    def _gen():
+        if len(ordered) < 2:
+            yield hermes.sse({"error": "这条路径上的内容找不到了"})
+            yield hermes.sse({"done": True})
+            return
+        items_ = [{"title": h.title, "summary": h.summary, "author": h.author, "type": h.type}
+                  for h in ordered]
+        yield from llm.stream_completion(path.build_messages(items_))
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 class _ScheduleRequest(BaseModel):
