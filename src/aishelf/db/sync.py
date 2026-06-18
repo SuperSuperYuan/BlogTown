@@ -15,7 +15,7 @@ from pathlib import Path
 
 from aishelf.contract.loader import load_items
 from aishelf import embed, alias
-from aishelf.db import schema, tokenize, vector, graph
+from aishelf.db import schema, tokenize, vector, graph, cluster
 from aishelf.db.config import default_db_path
 
 logger = logging.getLogger(__name__)
@@ -204,6 +204,22 @@ def sync(data_dir, db_path=None) -> SyncSummary:
             graph.delete_edges_for(con, stale)
         if embedded_ids:
             graph.recompute_edges_for(con, embedded_ids, floor=graph.GRAPH_SIM_FLOOR)
+
+        # Knowledge-graph clusters (主题星系): recompute when the embedding set
+        # changed; (LLM-)name only clusters whose membership is new.
+        if embedded_ids or stale:
+            to_name = cluster.recompute_clusters(con)
+            if to_name and alias.is_configured():
+                ordered = sorted(to_name)
+                names = alias.generate_cluster_names([to_name[c] for c in ordered])
+                if names and len(names) == len(ordered):
+                    for cid, nm in zip(ordered, names):
+                        con.execute("UPDATE clusters SET name=? WHERE id=?", (nm, cid))
+                elif names:
+                    logger.warning(
+                        "generate_cluster_names returned %d for %d clusters; skipping",
+                        len(names), len(ordered),
+                    )
 
         con.commit()
         return summary

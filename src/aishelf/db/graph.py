@@ -121,8 +121,11 @@ def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
     con = schema.connect(db_path)
     try:
         schema.init_db(con)
-        node_rows = con.execute("SELECT id, type, title, alias FROM items").fetchall()
+        node_rows = con.execute(
+            "SELECT id, type, title, alias, cluster, collected_at, hook FROM items"
+        ).fetchall()
         edge_rows = con.execute("SELECT src, dst, weight FROM edges").fetchall()
+        cluster_rows = con.execute("SELECT id, name, color FROM clusters").fetchall()
         groups = _load_groups(con)
     finally:
         con.close()
@@ -152,6 +155,16 @@ def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
         degree[s] = degree.get(s, 0) + 1
         degree[d] = degree.get(d, 0) + 1
 
+    csize: dict[int, int] = {}
+    for r in node_rows:
+        if r["cluster"] is not None:
+            csize[r["cluster"]] = csize.get(r["cluster"], 0) + 1
+    clusters = [
+        {"id": r["id"], "name": r["name"] or "", "color": r["color"] or "",
+         "size": csize.get(r["id"], 0)}
+        for r in cluster_rows
+    ]
+
     positions = _sphere_positions([r["id"] for r in node_rows], groups)
     nodes = []
     for r in node_rows:
@@ -159,9 +172,11 @@ def load_graph(db_path, *, cap_k: int = GRAPH_TOP_K) -> dict:
         nodes.append({
             "id": r["id"], "type": r["type"], "title": r["title"],
             "alias": r["alias"] or "", "degree": degree.get(r["id"], 0),
+            "cluster": r["cluster"], "collected_at": r["collected_at"],
+            "hook": r["hook"] or "",
             "x": x, "y": y, "z": z,
         })
-    return {"nodes": nodes, "edges": edges}
+    return {"nodes": nodes, "edges": edges, "clusters": clusters}
 
 
 def recompute_edges_for(con, item_ids, *, floor: float = GRAPH_SIM_FLOOR) -> None:

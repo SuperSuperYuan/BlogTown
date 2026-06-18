@@ -120,7 +120,7 @@ def test_load_graph_caps_top_k(tmp_path):
 def test_load_graph_empty(tmp_path):
     db = tmp_path / "atlas.db"
     con = schema.connect(db); schema.init_db(con); con.close()
-    assert graph.load_graph(db) == {"nodes": [], "edges": []}
+    assert graph.load_graph(db) == {"nodes": [], "edges": [], "clusters": []}
 
 
 def test_load_graph_drops_orphan_edges(tmp_path):
@@ -200,3 +200,46 @@ def test_load_graph_identical_embeddings_stay_on_sphere(tmp_path):
     for n in g["nodes"]:
         norm = math.sqrt(n["x"] ** 2 + n["y"] ** 2 + n["z"] ** 2)
         assert math.isclose(norm, 1.0, abs_tol=1e-5)
+
+
+def test_clusters_table_created(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    names = {r["name"] for r in con.execute("PRAGMA table_info(clusters)")}
+    con.close()
+    assert names == {"id", "name", "color", "signature"}
+
+
+def test_items_table_has_cluster_column(tmp_path):
+    con = schema.connect(tmp_path / "atlas.db")
+    schema.init_db(con)
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(items)")}
+    con.close()
+    assert "cluster" in cols
+
+
+def test_load_graph_nodes_carry_cluster_collected_at_hook(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    con.execute("UPDATE items SET cluster=0, hook='值得一看' WHERE id='a'")
+    con.commit(); con.close()
+    g = graph.load_graph(db)
+    a = next(n for n in g["nodes"] if n["id"] == "a")
+    assert a["cluster"] == 0
+    assert a["collected_at"] == "2024-01-02"
+    assert a["hook"] == "值得一看"
+
+
+def test_load_graph_emits_clusters_list(tmp_path):
+    db = tmp_path / "atlas.db"
+    con = schema.connect(db)
+    schema.init_db(con)
+    _seed_item(con, "a", "video", [1.0, 0.0])
+    _seed_item(con, "b", "blog", [0.97, 0.2])
+    con.execute("UPDATE items SET cluster=0 WHERE id IN ('a','b')")
+    con.execute("INSERT INTO clusters (id, name, color, signature) VALUES (0,'智能体','#ff9a3c','sig')")
+    con.commit(); con.close()
+    g = graph.load_graph(db)
+    assert g["clusters"] == [{"id": 0, "name": "智能体", "color": "#ff9a3c", "size": 2}]

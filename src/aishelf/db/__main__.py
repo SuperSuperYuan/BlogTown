@@ -34,7 +34,8 @@ def main(argv=None) -> int:
             con.executescript(
                 "DROP TABLE IF EXISTS items; "
                 "DROP TABLE IF EXISTS items_fts; "
-                "DROP TABLE IF EXISTS edges;"
+                "DROP TABLE IF EXISTS edges; "
+                "DROP TABLE IF EXISTS clusters;"
             )
             con.commit()
             con.close()

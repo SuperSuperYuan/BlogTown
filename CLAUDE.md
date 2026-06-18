@@ -50,8 +50,11 @@ Source layout uses a `src/` directory; package is `aishelf`.
   (caller falls back to truncated title); also `generate_hooks(pairs)` — same
   batched LLM core, same `ATLAS_CHAT_*` gate, same None-on-failure degradation —
   returns a one-sentence ≤30-char Chinese "为什么值得看" hook per item for browse
-  lists. Lives at package root so `db` can use it without importing `site` (same
-  pattern as `embed.py`).
+  lists; also `generate_cluster_names(clusters)` — same batched core / same
+  `ATLAS_CHAT_*` gate / same None-on-failure degradation — takes each theme
+  cluster's representative titles and returns a ≤6-char Chinese galaxy name for
+  `/graph`. Lives at package root so `db` can use it without importing `site`
+  (same pattern as `embed.py`).
 - `aishelf/site/` — `app.py` (routes + scheduler lifespan; browse/home/author
   routes surface per-item hooks via a `_hooks_for` helper that bridges
   `db_search.hooks_for` into the file-rendered lists), `views.py` (pure
@@ -88,7 +91,8 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
   `connect`/`init_db`; the `items` table now includes `embedding BLOB`,
-  `embedding_model TEXT`, `embedding_dim INTEGER`, `alias TEXT`, and `hook TEXT` — all
+  `embedding_model TEXT`, `embedding_dim INTEGER`, `alias TEXT`, `hook TEXT`, and
+  `cluster INTEGER` (theme-galaxy id) — all
   nullable, backfilled by `sync --rebuild`), `tokenize.py` (CJK bigram
   `bigrams`/`to_match_query`),
   `sync.py` (idempotent `sync` — upsert + prune; when `ATLAS_EMBED_*` is
@@ -100,9 +104,13 @@ Source layout uses a `src/` directory; package is `aishelf`.
   for new items and items whose title changed (and backfills any missing alias);
   note edits do NOT regenerate aliases; on the same title-keyed policy also
   generates and stores a per-item `hook` (new item / title change / missing;
-  note edits do NOT regenerate it); all in the same transaction; empty
-  graph when embeddings are unconfigured; embedding/alias/hook failure leaves rows
-  intact without crashing), `vector.py`
+  note edits do NOT regenerate it); then, on the same `embedded_ids or stale`
+  condition as edges, recomputes theme clusters via `cluster.recompute_clusters`
+  and (LLM-)names only clusters whose member signature is new (so note edits,
+  which re-embed but don't move cluster boundaries, cost no naming call); all in
+  the same transaction; empty
+  graph/clusters when embeddings are unconfigured; embedding/alias/hook/cluster
+  failure leaves rows intact without crashing), `vector.py`
   (float32 BLOB `pack`/`unpack`, `load_embeddings`, and brute-force numpy
   `cosine_search` — no vector index, exhaustive cosine over the corpus),
   `search.py` (`search` over FTS5; `get_by_ids` hydrates items by id into a
@@ -114,12 +122,21 @@ Source layout uses a `src/` directory; package is `aishelf`.
   truncates title) and a unit-sphere position `(x, y, z)` computed at read time
   by PCA of the embeddings — nodes without embeddings (or fewer than 3 embedded,
   or degenerate embeddings) get a deterministic `_hash_point` unit-sphere
-  placement; `author` is not included in node output; constants
+  placement; each node also carries `cluster`/`collected_at`/`hook`, and the
+  payload gains a top-level `clusters` list (`{id, name, color, size}`) for the
+  主题星系 frontend; `author` is not included in node output; constants
   `GRAPH_SIM_FLOOR=0.5`, `GRAPH_TOP_K=8`),
+  `cluster.py` (主题星系: pure `choose_k`/`kmeans` (deterministic numpy k-means on
+  L2-normalized vectors, no sklearn)/`representatives`/`color_for`/`PALETTE`, plus
+  the thin `recompute_clusters` that rewrites `items.cluster` + the `clusters`
+  table and carries a cluster's name forward when its member signature is
+  unchanged; lives in `db` so `sync` can use it without importing `site`, same as
+  `graph.py`),
   `__main__.py` (CLI). `schema.py` also creates the `edges` table (`src TEXT,
   dst TEXT, weight REAL, PRIMARY KEY(src,dst)` — undirected, stored canonically
-  with `src < dst`). The DB is a rebuildable view; files stay the source of
-  truth.
+  with `src < dst`) and the `clusters` table (`id INTEGER PRIMARY KEY, name TEXT,
+  color TEXT, signature TEXT`). The DB is a rebuildable view; files stay the
+  source of truth.
 
 **Data & storage** (`data/`, gitignored):
 
@@ -145,14 +162,17 @@ triggers an off-thread re-sync so the updated note is searchable immediately.
 The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
 browse/search pages still read files. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
-surface by PCA of embeddings, glowing arcs for edges, alias labels; OrbitControls
+surface by PCA of embeddings, colored by theme galaxy with floating galaxy labels
+  + a color legend, glowing arcs for edges, alias labels; OrbitControls
 drag-rotate + scroll-zoom + auto-rotate; hover, click, type filter, search
-highlight); `GET /api/graph` serves the raw `{nodes, edges}` JSON.
+highlight; a disabled 回放/漫游/路径 verb-pill is the Phase-2 placeholder);
+  `GET /api/graph` serves the raw `{nodes, edges, clusters}` JSON.
 `GET /collide` renders the 灵感碰撞 page; `POST /collide/chat` picks a
 surprising pair (embedding cosine mid-band) and streams a three-part 中文 synthesis. Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
 columns including `note`, backfill embeddings (when `ATLAS_EMBED_*` is
 configured) for hybrid `/ask` retrieval, backfill the `edges` table,
+the `cluster` column + `clusters` table (theme galaxies) for `/graph`,
 `alias` column for `/graph`, and `hook` column for browse lists
 (no startup/periodic sync by design).
 
