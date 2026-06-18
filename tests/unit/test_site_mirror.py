@@ -92,3 +92,40 @@ def test_load_profile_none_when_no_clusters(tmp_path):
 
 def test_load_profile_none_when_db_missing(tmp_path):
     assert mirror.load_profile(str(tmp_path / "nope.db")) is None
+
+
+import aishelf.site.app as app_module
+from aishelf.site.app import app
+from fastapi.testclient import TestClient
+
+
+def test_mirror_page_renders():
+    client = TestClient(app)
+    r = client.get("/mirror")
+    assert r.status_code == 200
+    assert "藏书镜" in r.text
+
+
+def test_mirror_chat_streams_profile_then_deltas(tmp_path, monkeypatch):
+    # default DB path is <data_dir>/atlas.db, so seed directly there
+    _seed(str(tmp_path / "atlas.db"))
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module.llm, "stream_completion",
+                        lambda messages: iter([app_module.hermes.sse({"delta": "你是"}),
+                                               app_module.hermes.sse({"done": True})]))
+    client = TestClient(app)
+    body = client.post("/mirror/chat").text
+    assert '"profile"' in body
+    assert "推理" in body
+    assert "你是" in body
+
+
+def test_mirror_chat_error_when_no_clusters(tmp_path, monkeypatch):
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    con = db_schema.connect(str(tmp_path / "atlas.db"))
+    db_schema.init_db(con)
+    _insert_item(con, id="x", cluster=None)
+    con.commit(); con.close()
+    client = TestClient(app)
+    body = client.post("/mirror/chat").text
+    assert '"error"' in body
