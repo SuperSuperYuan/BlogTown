@@ -163,6 +163,25 @@ author, collected_at, title, cluster`. The `clusters` table: `id, name, color`.
 # add to tests/unit/test_site_mirror.py
 from aishelf.db import schema as db_schema
 
+# Many items columns are NOT NULL with no default — insert a full row and let
+# callers override the fields that matter to the test.
+_ITEM_COLS = ["id", "type", "title", "author", "platform", "source_url",
+              "published_at", "collected_at", "summary", "keywords",
+              "content_hash", "synced_at", "cluster"]
+
+
+def _insert_item(con, *, id, type="video", title="t", author="A",
+                 collected_at="2026-01-01T00:00:00", cluster=None):
+    vals = {
+        "id": id, "type": type, "title": title, "author": author,
+        "platform": "p", "source_url": "https://x", "published_at": collected_at,
+        "collected_at": collected_at, "summary": "s", "keywords": "[]",
+        "content_hash": "h", "synced_at": collected_at, "cluster": cluster,
+    }
+    placeholders = ",".join("?" for _ in _ITEM_COLS)
+    con.execute(f"INSERT INTO items ({','.join(_ITEM_COLS)}) VALUES ({placeholders})",
+                [vals[c] for c in _ITEM_COLS])
+
 
 def _seed(db_path):
     con = db_schema.connect(db_path)
@@ -176,11 +195,8 @@ def _seed(db_path):
         ("v3", "video", "B", "2026-05-01T00:00:00", "多模态一", 1),  # most recent
     ]
     for id_, type_, author, collected, title, cluster in rows:
-        con.execute(
-            "INSERT INTO items (id, type, title, author, collected_at, cluster) "
-            "VALUES (?,?,?,?,?,?)",
-            (id_, type_, title, author, collected, cluster),
-        )
+        _insert_item(con, id=id_, type=type_, title=title, author=author,
+                     collected_at=collected, cluster=cluster)
     con.commit()
     con.close()
 
@@ -207,7 +223,7 @@ def test_load_profile_none_when_no_clusters(tmp_path):
     db = str(tmp_path / "atlas.db")
     con = db_schema.connect(db)
     db_schema.init_db(con)
-    con.execute("INSERT INTO items (id, type, title) VALUES ('x','video','t')")
+    _insert_item(con, id="x", cluster=None)
     con.commit(); con.close()
     assert mirror.load_profile(db) is None
 
@@ -355,7 +371,7 @@ def test_mirror_chat_error_when_no_clusters(tmp_path, monkeypatch):
     monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
     con = db_schema.connect(str(tmp_path / "atlas.db"))
     db_schema.init_db(con)
-    con.execute("INSERT INTO items (id, type, title) VALUES ('x','video','t')")
+    _insert_item(con, id="x", cluster=None)
     con.commit(); con.close()
     client = TestClient(app)
     body = client.post("/mirror/chat").text
