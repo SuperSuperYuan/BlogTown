@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="learn">
+  <h2>进阶路线</h2>
+  {% for g in galaxies %}<span class="lx-pill">{{ g.name }}</span>{% endfor %}
+  <script type="application/json" id="galaxies-data">{{ galaxies_json | tojson }}</script>
+</section>
+{% endblock %}

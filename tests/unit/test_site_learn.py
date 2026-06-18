@@ -71,3 +71,37 @@ def test_load_galaxies_empty_when_no_clusters(tmp_path):
 
 def test_load_galaxies_empty_when_db_missing(tmp_path):
     assert learn.load_galaxies(str(tmp_path / "nope.db")) == []
+
+
+import aishelf.site.app as app_module
+from aishelf.site.app import app
+from fastapi.testclient import TestClient
+
+
+def test_learn_page_renders(tmp_path, monkeypatch):
+    _seed(str(tmp_path / "atlas.db"))
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    r = TestClient(app).get("/learn")
+    assert r.status_code == 200
+    assert "进阶路线" in r.text
+    assert "推理" in r.text
+    assert "v1" in r.text
+
+
+def test_learn_route_streams_for_known_cluster(tmp_path, monkeypatch):
+    _seed(str(tmp_path / "atlas.db"))
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module.llm, "stream_completion",
+                        lambda messages: iter([app_module.hermes.sse({"delta": "1. 推理一 — 起点"}),
+                                               app_module.hermes.sse({"done": True})]))
+    body = TestClient(app).post("/learn/route", json={"cluster_id": 0}).text
+    assert '"galaxy"' in body
+    assert "推理一" in body
+    assert "done" in body
+
+
+def test_learn_route_error_for_unknown_cluster(tmp_path, monkeypatch):
+    _seed(str(tmp_path / "atlas.db"))
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    body = TestClient(app).post("/learn/route", json={"cluster_id": 999}).text
+    assert '"error"' in body
