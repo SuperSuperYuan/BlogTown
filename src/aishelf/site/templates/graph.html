@@ -16,9 +16,14 @@
   </div>
   <div id="globe" class="globe-canvas"></div>
   <div class="verb-pill" id="verbPill">
-    <button type="button" disabled title="即将上线">▶ 回放</button>
+    <button type="button" data-mode="replay">▶ 回放</button>
     <button type="button" disabled title="即将上线">🛸 逛逛</button>
     <button type="button" disabled title="即将上线">🔗 路径</button>
+  </div>
+  <div class="replay-bar" id="replayBar">
+    <span class="play" id="replayPlay">⏸</span>
+    <input type="range" id="replayRange" min="0" max="1000" value="1000" />
+    <span class="date" id="replayDate"></span>
   </div>
   <div id="globeTip" class="globe-tip" hidden></div>
   <div id="globeEmpty" class="globe-empty" hidden>
@@ -54,7 +59,17 @@
                display: flex; gap: 6px; background: rgba(10,15,30,.85); border: 1px solid #24365f;
                border-radius: 999px; padding: 5px 7px; z-index: 3; }
   .verb-pill button { border: none; background: transparent; color: #bcd4ff; font-size: 13px;
-                      padding: 4px 12px; border-radius: 999px; cursor: not-allowed; opacity: .5; }
+                      padding: 4px 12px; border-radius: 999px; cursor: pointer; opacity: .85; }
+  .verb-pill button:disabled { cursor: not-allowed; opacity: .4; }
+  .verb-pill button.on { background: #16263f; color: #fff; opacity: 1; }
+  .replay-bar { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+    display: none; align-items: center; gap: 10px; background: rgba(10,15,30,.9);
+    border: 1px solid #24365f; border-radius: 999px; padding: 6px 14px; z-index: 3;
+    color: #cdd8ef; font-size: 12px; }
+  .replay-bar.show { display: flex; }
+  .replay-bar input[type=range] { width: 220px; }
+  .replay-bar .play { cursor: pointer; width: 26px; text-align: center; user-select: none; }
+  .replay-bar .date { min-width: 88px; font-variant-numeric: tabular-nums; }
 </style>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -256,6 +271,100 @@
     }
   });
 
+  // ---- shared world positions + adjacency (used by tour / path) ----
+  const posOf = {};
+  for (const n of data.nodes) posOf[n.id] = new THREE.Vector3(n.x * R, n.y * R, n.z * R);
+  const adj = {};
+  for (const e of (data.edges || [])) {
+    (adj[e.source] || (adj[e.source] = [])).push({ id: e.target, w: e.weight });
+    (adj[e.target] || (adj[e.target] = [])).push({ id: e.source, w: e.weight });
+  }
+  const meshOf = {};
+  for (const m of nodeMeshes) meshOf[m.userData.id] = m;
+
+  // ---- mode manager: at most one active verb; leaving restores the rest state ----
+  let frameHook = null, exitMode = null, currentMode = null;
+  const MODES = {};
+  function restoreAll() {
+    for (const m of nodeMeshes) {
+      m.visible = true; m.material.opacity = 1;
+      if (m.userData._label) { m.userData._label.visible = true; m.userData._label.element.style.opacity = '1'; }
+    }
+  }
+  function leaveMode() {
+    if (exitMode) { try { exitMode(); } catch (e) {} }
+    exitMode = null; frameHook = null; currentMode = null;
+    document.querySelectorAll('#verbPill button').forEach((b) => b.classList.remove('on'));
+    restoreAll();
+    controls.autoRotate = true;
+  }
+  function setMode(name) {
+    if (currentMode === name) { leaveMode(); return; }   // toggle off
+    leaveMode();
+    currentMode = name;
+    document.querySelectorAll('#verbPill button').forEach((b) => b.classList.toggle('on', b.dataset.mode === name));
+    controls.autoRotate = false;
+    exitMode = MODES[name] ? (MODES[name]() || null) : null;
+  }
+  document.getElementById('verbPill').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.mode) setMode(b.dataset.mode);
+  });
+
+  // ---- B 时间回放 ----
+  MODES.replay = function () {
+    const bar = document.getElementById('replayBar');
+    const range = document.getElementById('replayRange');
+    const playBtn = document.getElementById('replayPlay');
+    const dateEl = document.getElementById('replayDate');
+    const times = data.nodes.map((n) => Date.parse(n.collected_at) || 0);
+    const tmin = Math.min(...times), tmax = Math.max(...times) || (tmin + 1);
+    const span = (tmax - tmin) || 1;
+    const DURATION = 18000;          // ms for a full sweep
+    let p = 0, playing = true, last = performance.now();
+
+    function applyAt(pp) {
+      const cutoff = tmin + pp * span;
+      for (const m of nodeMeshes) {
+        const t = Date.parse(m.userData.collected_at) || 0;
+        const born = t <= cutoff;
+        const fade = born ? Math.min(1, (cutoff - t) / (span * 0.04 + 1)) : 0;
+        m.visible = born;
+        m.material.opacity = born ? Math.max(0.2, fade) : 0;
+        if (m.userData._label) {
+          m.userData._label.visible = born;
+          m.userData._label.element.style.opacity = born ? String(Math.max(0.2, fade)) : '0';
+        }
+      }
+      dateEl.textContent = new Date(cutoff).toISOString().slice(0, 10);
+      range.value = String(Math.round(pp * 1000));
+    }
+
+    bar.classList.add('show');
+    frameHook = function () {
+      if (playing) {
+        const now = performance.now();
+        p += (now - last) / DURATION; last = now;
+        if (p >= 1) { p = 1; playing = false; playBtn.textContent = '▶'; }
+        applyAt(p);
+      } else { last = performance.now(); }
+    };
+    playBtn.onclick = function () {
+      if (p >= 1) p = 0;             // restart from the beginning
+      playing = !playing; playBtn.textContent = playing ? '⏸' : '▶';
+      last = performance.now();
+    };
+    range.oninput = function () {
+      playing = false; playBtn.textContent = '▶';
+      p = Number(range.value) / 1000; applyAt(p);
+    };
+    applyAt(0);
+    return function exit() {
+      bar.classList.remove('show');
+      playBtn.onclick = null; range.oninput = null;
+    };
+  };
+
   function resize() {
     camera.aspect = W() / H(); camera.updateProjectionMatrix();
     renderer.setSize(W(), H()); labelRenderer.setSize(W(), H());
@@ -264,6 +373,7 @@
 
   (function animate() {
     requestAnimationFrame(animate);
+    if (frameHook) frameHook();
     controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
