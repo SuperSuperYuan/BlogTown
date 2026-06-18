@@ -304,3 +304,13 @@ main:has(.write) { max-width: 1280px; }
   border: 1px solid #3a2c31;
 }
 .critique-result.err { color: #ff9d9d; }
+
+/* 关键词宇宙 / 标签云 */
+.kw-cloud h1 .hint { font-size: .5em; font-weight: 400; color: #8a8f98; margin-left: .5em; }
+.kw-cloud .tagcloud {
+  display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; align-items: baseline;
+  margin-top: 1.3rem; line-height: 1.7;
+}
+.kw-cloud .tagcloud a { color: #cdd3da; text-decoration: none; }
+.kw-cloud .tagcloud a:hover { color: #8ab4ff; }
+.kw-cloud .tc-count { font-size: .55em; color: #8a8f98; margin-left: .12em; vertical-align: super; }
