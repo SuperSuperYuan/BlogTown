@@ -1,8 +1,80 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="learn">
-  <h2>进阶路线</h2>
-  {% for g in galaxies %}<span class="lx-pill">{{ g.name }}</span>{% endfor %}
+  <h2>进阶路线 <span class="hint">挑一个主题星系，把它排成一条由浅入深的路</span></h2>
+  {% if galaxies %}
+  <div class="lx-pills">
+    {% for g in galaxies %}
+    <button type="button" class="lx-pill" data-cid="{{ g.id }}"
+            style="--c: {{ g.color if g.color|length == 7 else '#888' }}">{{ g.name or '未命名' }} · {{ g.size }}</button>
+    {% endfor %}
+  </div>
+  <div class="learn-result" id="result"></div>
+  {% else %}
+  <p class="hint">先采集内容并同步图谱（<code>python -m aishelf.db sync --rebuild</code>）后再来。</p>
+  {% endif %}
   <script type="application/json" id="galaxies-data">{{ galaxies_json | tojson }}</script>
 </section>
+<script>
+(function () {
+  const resultEl = document.getElementById("result");
+  const dataEl = document.getElementById("galaxies-data");
+  if (!resultEl || !dataEl) return;
+  let byCluster = {};
+  try {
+    JSON.parse(dataEl.textContent).forEach(g => { byCluster[g.id] = g.items || []; });
+  } catch (e) { byCluster = {}; }
+
+  function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+
+  let busy = false;
+  function render(cid, text) {
+    const items = byCluster[cid] || [];
+    const lines = text.split("\n");
+    const html = lines.map(line => {
+      const hit = items.find(it => it.title && line.indexOf(it.title) !== -1);
+      if (!hit) return escapeHtml(line);
+      const href = (hit.type === "video" ? "/videos/" : "/blogs/") + encodeURIComponent(hit.id);
+      const esc = escapeHtml(line);
+      return esc.replace(escapeHtml(hit.title),
+        '<a href="' + href + '">' + escapeHtml(hit.title) + "</a>");
+    }).join("<br>");
+    resultEl.innerHTML = html;
+  }
+
+  async function run(cid, pill) {
+    if (busy) return;
+    busy = true;
+    document.querySelectorAll(".lx-pill").forEach(p => p.classList.toggle("active", p === pill));
+    resultEl.textContent = "正在规划路线…";
+    let resp;
+    try {
+      resp = await fetch("/learn/route", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cluster_id: cid }),
+      });
+    } catch (e) { resultEl.textContent = "⚠️ 无法连接服务"; busy = false; return; }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", acc = "", streaming = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        let p; try { p = JSON.parse(line.slice(6)); } catch (e) { continue; }
+        if (p.delta) { if (!streaming) { streaming = true; acc = ""; } acc += p.delta; render(cid, acc); }
+        else if (p.error) { resultEl.textContent = "⚠️ " + p.error; }
+      }
+    }
+    busy = false;
+  }
+
+  document.querySelectorAll(".lx-pill").forEach(pill => {
+    pill.addEventListener("click", () => run(parseInt(pill.getAttribute("data-cid"), 10), pill));
+  });
+})();
+</script>
 {% endblock %}

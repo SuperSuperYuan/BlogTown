@@ -105,3 +105,17 @@ def test_learn_route_error_for_unknown_cluster(tmp_path, monkeypatch):
     monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
     body = TestClient(app).post("/learn/route", json={"cluster_id": 999}).text
     assert '"error"' in body
+
+
+def test_topbar_has_learn_link(tmp_path, monkeypatch):
+    _seed(str(tmp_path / "atlas.db"))
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    r = TestClient(app).get("/learn")
+    assert 'href="/learn"' in r.text
+
+
+def test_learn_page_has_pill_data_attr(tmp_path, monkeypatch):
+    _seed(str(tmp_path / "atlas.db"))
+    monkeypatch.setenv("AISHELF_DATA_DIR", str(tmp_path))
+    r = TestClient(app).get("/learn")
+    assert 'data-cid="0"' in r.text

@@ -275,3 +275,20 @@ main:has(.write) { max-width: 1280px; }
   background: linear-gradient(135deg, rgba(192,140,255,.08), rgba(76,194,255,.06));
   border: 1px solid #2c313b;
 }
+
+/* 进阶路线 / 学习路径 */
+.learn h2 .hint { font-size: .55em; font-weight: 400; color: #8a8f98; margin-left: .5em; }
+.lx-pills { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+.lx-pill {
+  cursor: pointer; font-size: .85rem; padding: .3rem .8rem; border-radius: 999px;
+  color: var(--c); border: 1px solid var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.lx-pill.active { background: color-mix(in srgb, var(--c) 28%, transparent); font-weight: 600; }
+.learn-result {
+  white-space: normal; line-height: 1.9; font-size: .95rem; margin-top: 1rem;
+  padding: 1rem 1.2rem; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(56,225,192,.07), rgba(76,194,255,.06));
+  border: 1px solid #2c313b;
+}
+.learn-result a { color: #8ab4ff; }
