@@ -116,6 +116,17 @@ def _item_dict(it) -> dict:
             "author": it.author, "type": it.type}
 
 
+def _item_detail(it, note: str) -> dict:
+    """JSON detail for the /graph node panel: contract fields the graph payload
+    omits, plus the user's note rendered to sanitized HTML."""
+    return {
+        "id": it.id, "type": it.type, "title": it.title, "author": it.author,
+        "published_at": it.published_at, "summary": it.summary,
+        "keywords": list(it.keywords),
+        "note_html": markdown.render_markdown(note),
+    }
+
+
 def _resolve_pair(items, space, *, a_id, b_id, lock_id, rng):
     """Resolve a (item_a, item_b) pair from explicit ids, else a surprising pick
     (with random fallback). Returns None when no pair can be formed."""
@@ -479,6 +490,20 @@ def graph_path(req: _PathRequest):
         yield from llm.stream_completion(path.build_messages(items_))
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.get("/api/item/{id}")
+def api_item(id: str):
+    """Read-only per-item detail for the /graph node panel. 404 on unknown or
+    path-unsafe id; ungated like the rest of browsing."""
+    try:
+        items.safe_id(id)
+    except ValueError:
+        raise HTTPException(status_code=404)
+    it = next((x for x in _items() if x.id == id), None)
+    if it is None:
+        raise HTTPException(status_code=404)
+    return _item_detail(it, _note_for(it))
 
 
 class _ScheduleRequest(BaseModel):

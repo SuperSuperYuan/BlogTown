@@ -172,9 +172,16 @@ highlight; a bottom verb-pill drives three transient modes over the rest state �
   B 时间回放 (nodes fade in by `collected_at` with a scrubber), D 语义漫游 (camera
   auto-tours the edge graph with hook narration + 跨星系 announcements), and E 语义路径
   (pick two stars → client-side Dijkstra over `data.edges` → a drawn glowing path
-  line → streamed 中文 explanation));
+  line → streamed 中文 explanation)); in the rest state, single-clicking a node
+  opens an in-page detail side panel (type/galaxy chip, title, hook, summary,
+  keywords, rendered note, and a clickable 语义相邻 neighbor list from `adj`) that
+  highlights the node + neighbors / dims the rest / pauses auto-rotate (✕ / Esc /
+  empty-click to close; entering a verb mode closes it) — replacing the old
+  open-in-new-tab click;
   `GET /api/graph` serves the raw `{nodes, edges, clusters}` JSON;
-  `POST /graph/path` streams the path explanation for E.
+  `POST /graph/path` streams the path explanation for E;
+  `GET /api/item/{id}` returns read-only per-item detail (summary/author/keywords +
+  rendered note HTML) for the node panel (`safe_id` guard; unknown/unsafe id → 404).
 `GET /collide` renders the 灵感碰撞 page; `POST /collide/chat` picks a
 surprising pair (embedding cosine mid-band) and streams a three-part 中文 synthesis. Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
