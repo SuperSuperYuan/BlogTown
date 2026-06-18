@@ -29,6 +29,7 @@ from aishelf.site import (
     ask,
     collide,
     collect,
+    critique,
     hermes,
     items,
     learn,
@@ -670,6 +671,24 @@ def note_draft(item_id: str):
 
     def _gen():
         yield from llm.stream_completion(notedraft.build_messages(_item_dict(it), existing))
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.post("/critique/{item_id}")
+def critique_route(item_id: str):
+    # Ungated: critique is cheap (like /ask, /collide, /notes/{id}/draft), not the Hermes path.
+    try:
+        items.safe_id(item_id)
+    except ValueError:
+        raise HTTPException(status_code=404)
+    it = next((x for x in _items() if x.id == item_id), None)
+    if it is None:
+        raise HTTPException(status_code=404)
+    note = _note_for(it)
+
+    def _gen():
+        yield from llm.stream_completion(critique.build_messages(_item_dict(it), note))
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
 

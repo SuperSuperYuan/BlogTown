@@ -1,0 +1,42 @@
+<section class="critique">
+  <div class="critique-head">
+    <h2>抬杠</h2>
+    <button id="critique-btn" type="button" class="btn-link">🔥 唱个反调</button>
+  </div>
+  <div id="critique-result" class="critique-result" hidden></div>
+</section>
+<script>
+(function () {
+  const btn = document.getElementById("critique-btn");
+  const out = document.getElementById("critique-result");
+  let busy = false;
+  btn.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true; btn.disabled = true; out.hidden = false; out.className = "critique-result";
+    out.textContent = "正在抬杠…";
+    let resp;
+    try {
+      resp = await fetch("/critique/{{ item.id }}", { method: "POST" });
+    } catch (e) { out.className = "critique-result err"; out.textContent = "⚠️ 无法连接服务"; busy = false; btn.disabled = false; return; }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", acc = "", streaming = false;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n"); buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          let p; try { p = JSON.parse(line.slice(6)); } catch (e) { continue; }
+          if (p.delta) { if (!streaming) { streaming = true; acc = ""; out.textContent = ""; } acc += p.delta; out.textContent = acc; }
+          else if (p.error) { out.className = "critique-result err"; out.textContent = "⚠️ " + p.error; }
+        }
+      }
+    } finally {
+      busy = false; btn.disabled = false;
+    }
+  });
+})();
+</script>
