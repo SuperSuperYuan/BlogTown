@@ -447,16 +447,21 @@ def _cluster_of(db_path, vid):
 
 def test_sync_clusters_items_when_embeddings_configured(tmp_path, monkeypatch):
     data, db = tmp_path / "data", tmp_path / "atlas.db"
-    _write_video(data, "v1")
-    _write_video(data, "v2")
+    # 4 items in two clearly-separated groups -> choose_k(4) == 3, so the
+    # multi-cluster path is exercised (not the trivial k=1 single-cluster case).
+    vecs = [[1.0, 0.0], [0.97, 0.2], [-1.0, 0.0], [-0.98, 0.1]]
+    for i in range(4):
+        _write_video(data, f"v{i + 1}")
     monkeypatch.setattr(embed, "model_name", lambda: "fake-embed")
-    monkeypatch.setattr(embed, "embed_texts", lambda texts: [[1.0, 0.0], [0.97, 0.2]][: len(texts)])
+    monkeypatch.setattr(embed, "embed_texts", lambda texts: vecs[: len(texts)])
     monkeypatch.setattr(_alias, "is_configured", lambda: False)   # isolate clustering from naming
     sync(data, db)
-    assert _cluster_of(db, "v1") is not None
+    assert all(_cluster_of(db, f"v{i + 1}") is not None for i in range(4))  # every item assigned
     con = schema.connect(db)
-    assert con.execute("SELECT count(*) FROM clusters").fetchone()[0] >= 1
+    n_clusters = con.execute("SELECT count(*) FROM clusters").fetchone()[0]
+    assigned = con.execute("SELECT count(DISTINCT cluster) FROM items").fetchone()[0]
     con.close()
+    assert n_clusters >= 2 and n_clusters == assigned   # real multi-cluster split, table matches assignments
 
 
 def test_sync_no_clusters_when_embeddings_unconfigured(tmp_path, monkeypatch):

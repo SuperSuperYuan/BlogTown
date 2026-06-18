@@ -203,10 +203,13 @@
     if (hovered && hovered.userData.href) window.open(hovered.userData.href, '_blank', 'noopener');
   });
 
+  let legendActive = null;   // shared so the type filter can clear legend isolation
   document.getElementById('globeFilters').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     document.getElementById('globeSearch').value = '';
     document.querySelectorAll('#globeFilters button').forEach((x) => x.classList.toggle('on', x === b));
+    legendActive = null;
+    document.querySelectorAll('#globeLegend button').forEach((x) => x.classList.remove('off'));
     const f = b.dataset.f;
     for (const m of nodeMeshes) {
       const vis = (f === 'all' || m.userData.type === f);
@@ -221,22 +224,21 @@
 
   (function buildLegend() {
     const box = document.getElementById('globeLegend');
-    let active = null;
     for (const c of (data.clusters || [])) {
       const b = document.createElement('button');
       b.innerHTML = '<span class="sw" style="background:' + (c.color || '#888') + '"></span>'
         + (c.name || ('星系 ' + c.id));
       b.addEventListener('click', () => {
-        active = (active === c.id) ? null : c.id;
+        legendActive = (legendActive === c.id) ? null : c.id;
         document.querySelectorAll('#globeLegend button').forEach((x) => x.classList.remove('off'));
         for (const m of nodeMeshes) {
-          const vis = (active == null) || (m.userData.cluster === active);
+          const vis = (legendActive == null) || (m.userData.cluster === legendActive);
           m.material.opacity = vis ? 1 : 0.08;
           if (m.userData._label) m.userData._label.element.style.opacity = vis ? '1' : '0.08';
         }
-        if (active != null) {
+        if (legendActive != null) {
           document.querySelectorAll('#globeLegend button').forEach((x, i) => {
-            if ((data.clusters[i] || {}).id !== active) x.classList.add('off');
+            if ((data.clusters[i] || {}).id !== legendActive) x.classList.add('off');
           });
         }
       });
