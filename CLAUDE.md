@@ -70,7 +70,12 @@ Source layout uses a `src/` directory; package is `aishelf`.
   the template `_note_editor.html` shows the rendered view by default with an 「编辑」
   button to switch to the textarea, and shows the textarea directly when there is no
   note yet; `POST /notes/{id}` saves the text and returns `{"html": …}` so the
-  client swaps the view in place without a reload), `items.py` (`safe_id` +
+  client swaps the view in place without a reload),
+  `notedraft.py` (AI 笔记草稿: pure `build_messages` — from an item's
+  title/summary/keywords (+ any existing note) phrases a 中文 Markdown note
+  skeleton 要点/为什么值得记/待探索; mirrors collide.py/mirror.py's pure half;
+  streamed by `POST /notes/{id}/draft`, no persistence/new config),
+  `items.py` (`safe_id` +
   `delete_item`), `markdown.py` (render user markdown →
   sanitized HTML via markdown-it-py + nh3; never raises), `posts.py`
   (`create_post`/`read_post`/`update_post` for self-authored blogs; atomic writes
@@ -167,6 +172,10 @@ CJK full-text search. The `items_fts` table also indexes per-item note text (the
 any time (`python -m aishelf.db sync`). It is synced after each collection
 (scheduled runs, and off-thread after manual chat collection); saving a note also
 triggers an off-thread re-sync so the updated note is searchable immediately.
+`POST /notes/{id}/draft` streams an AI-drafted note skeleton (要点/为什么值得记/待探索)
+from the item's metadata into the editor textarea via `llm.stream_completion`
+(ungated like /ask; `safe_id` guard, unknown/unsafe id → 404); the user edits and
+saves through `POST /notes/{id}` — drafts are never auto-saved.
 The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
 browse/search pages still read files. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
