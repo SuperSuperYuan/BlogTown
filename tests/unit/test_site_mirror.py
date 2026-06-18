@@ -129,3 +129,15 @@ def test_mirror_chat_error_when_no_clusters(tmp_path, monkeypatch):
     client = TestClient(app)
     body = client.post("/mirror/chat").text
     assert '"error"' in body
+
+
+def test_topbar_has_mirror_link():
+    client = TestClient(app)
+    r = client.get("/mirror")
+    assert 'href="/mirror"' in r.text
+
+
+def test_mirror_page_has_action_button():
+    client = TestClient(app)
+    r = client.get("/mirror")
+    assert "照一照" in r.text
