@@ -90,6 +90,11 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `digest.py` (今日速读: pure `build_digest` — recent items sorted by `collected_at` + one
   date-seeded older "gem" via `random.Random(today)`, each carrying its A-hook; no LLM/cache;
   rendered as a 今日速读 card at the top of `GET /`),
+  `mirror.py` (藏书镜: pure `build_messages` + tolerant `load_profile` — reads the
+  `clusters`/`items` derived tables into a Profile of theme galaxies + corpus
+  stats (type/author/time span, recent-window per galaxy); mirrors
+  collide.py/digest.py's pure-logic split; reuses `ATLAS_CHAT_*` via `llm`; no
+  LLM at load time, no persistence),
   `templates/`, `static/`, `__main__.py`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
@@ -183,7 +188,11 @@ highlight; a bottom verb-pill drives three transient modes over the rest state �
   `GET /api/item/{id}` returns read-only per-item detail (summary/author/keywords +
   rendered note HTML) for the node panel (`safe_id` guard; unknown/unsafe id → 404).
 `GET /collide` renders the 灵感碰撞 page; `POST /collide/chat` picks a
-surprising pair (embedding cosine mid-band) and streams a three-part 中文 synthesis. Initial
+surprising pair (embedding cosine mid-band) and streams a three-part 中文 synthesis.
+`GET /mirror` renders the 藏书镜 page; `POST /mirror/chat` builds a collection
+profile from the theme galaxies and streams a 中文 阅读人格 portrait (主线/转向/盲区/
+人格 + 一条只从已有收藏延伸的建议); ungated like /collide, and degrades to a friendly
+empty state when no clusters exist. Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
 columns including `note`, backfill embeddings (when `ATLAS_EMBED_*` is
 configured) for hybrid `/ask` retrieval, backfill the `edges` table,
