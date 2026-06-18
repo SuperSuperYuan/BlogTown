@@ -12,8 +12,14 @@
       <button type="button" data-f="video">视频</button>
       <button type="button" data-f="blog">博客</button>
     </div>
+    <div class="globe-legend" id="globeLegend"></div>
   </div>
   <div id="globe" class="globe-canvas"></div>
+  <div class="verb-pill" id="verbPill">
+    <button type="button" disabled title="即将上线">▶ 回放</button>
+    <button type="button" disabled title="即将上线">🛸 逛逛</button>
+    <button type="button" disabled title="即将上线">🔗 路径</button>
+  </div>
   <div id="globeTip" class="globe-tip" hidden></div>
   <div id="globeEmpty" class="globe-empty" hidden>
     图谱暂时没有数据。先在 <a href="/collect">Hermes</a> 采集内容，配置好 embedding 服务后运行一次
@@ -36,6 +42,19 @@
   .globe-tip { position: absolute; z-index: 3; max-width: 320px; background: rgba(8,14,28,.94); color: #e7eefb; border: 1px solid #24365f; border-radius: 8px; padding: 6px 10px; font-size: 12px; line-height: 1.5; pointer-events: none; }
   .globe-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); max-width: 460px; text-align: center; color: #8aa0cc; font-size: 14px; line-height: 1.7; }
   .globe-empty code { background: #111c33; padding: 2px 6px; border-radius: 6px; }
+  .galaxy-label { color: #eaf2ff; font-size: 14px; font-weight: 700; opacity: .55;
+                  text-shadow: 0 0 10px rgba(40,120,220,.8); pointer-events: none; white-space: nowrap; }
+  .globe-legend { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .globe-legend button { display: inline-flex; align-items: center; gap: 5px; height: 28px;
+                         padding: 0 10px; border: 1px solid #1d2a48; background: #0c1426;
+                         color: #aebbd9; border-radius: 999px; cursor: pointer; font-size: 12px; }
+  .globe-legend button.off { opacity: .4; }
+  .globe-legend .sw { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .verb-pill { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+               display: flex; gap: 6px; background: rgba(10,15,30,.85); border: 1px solid #24365f;
+               border-radius: 999px; padding: 5px 7px; z-index: 3; }
+  .verb-pill button { border: none; background: transparent; color: #bcd4ff; font-size: 13px;
+                      padding: 4px 12px; border-radius: 999px; cursor: not-allowed; opacity: .5; }
 </style>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -52,6 +71,13 @@
   const W = () => container.clientWidth, H = () => container.clientHeight;
   const R = 100;
   const COLOR = { video: 0xff9a3c, blog: 0x4cc2ff };
+  const CLUSTER_COLOR = {};
+  for (const c of (data.clusters || [])) {
+    if (c.color) CLUSTER_COLOR[c.id] = parseInt(c.color.replace('#', '0x'));
+  }
+  const nodeColor = (n) =>
+    (n.cluster != null && CLUSTER_COLOR[n.cluster] != null) ? CLUSTER_COLOR[n.cluster]
+      : (COLOR[n.type] || 0x9aa6bb);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, W() / H(), 1, 5000);
@@ -105,11 +131,19 @@
     n.href = (n.type === 'video' ? '/videos/' : '/blogs/') + encodeURIComponent(n.id);
     const size = 3 + 1.0 * Math.min(n.degree || 0, 8);   // dot diameter (world units)
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: DOT, color: COLOR[n.type] || 0x9aa6bb, transparent: true, opacity: 1, depthWrite: false,
+      map: DOT, color: nodeColor(n), transparent: true, opacity: 1, depthWrite: false,
     }));
     sprite.scale.set(size, size, 1);
     sprite.position.set(n.x * R, n.y * R, n.z * R);
     sprite.userData = n;
+    if (n.type === 'blog') {
+      const ring = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: DOT, color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false,
+      }));
+      ring.scale.set(size * 1.7, size * 1.7, 1);
+      ring.position.copy(sprite.position);
+      scene.add(ring);
+    }
     scene.add(sprite); nodeMeshes.push(sprite);
 
     // Label in world space (nodes are static; avoids sprite-scale offset issues).
@@ -120,6 +154,26 @@
     label.position.set(n.x * R, n.y * R + size * 0.5 + 2.5, n.z * R);
     scene.add(label);
     n._label = label;
+  }
+
+  // Floating galaxy-name labels at each cluster's centroid.
+  const galaxyAcc = {};   // cluster id -> {sx, sy, sz, n}
+  for (const n of data.nodes) {
+    if (n.cluster == null) continue;
+    const g = galaxyAcc[n.cluster] || (galaxyAcc[n.cluster] = { sx: 0, sy: 0, sz: 0, n: 0 });
+    g.sx += n.x; g.sy += n.y; g.sz += n.z; g.n++;
+  }
+  const clusterName = {};
+  for (const c of (data.clusters || [])) clusterName[c.id] = c.name || '';
+  for (const [cid, g] of Object.entries(galaxyAcc)) {
+    const name = clusterName[cid] || ('星系 ' + cid);
+    const cx = g.sx / g.n, cy = g.sy / g.n, cz = g.sz / g.n;
+    const div = document.createElement('div');
+    div.className = 'galaxy-label';
+    div.textContent = name;
+    const label = new THREE.CSS2DObject(div);
+    label.position.set(cx * R * 1.08, cy * R * 1.08, cz * R * 1.08);
+    scene.add(label);
   }
 
   const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
@@ -164,6 +218,31 @@
       }
     }
   });
+
+  (function buildLegend() {
+    const box = document.getElementById('globeLegend');
+    let active = null;
+    for (const c of (data.clusters || [])) {
+      const b = document.createElement('button');
+      b.innerHTML = '<span class="sw" style="background:' + (c.color || '#888') + '"></span>'
+        + (c.name || ('星系 ' + c.id));
+      b.addEventListener('click', () => {
+        active = (active === c.id) ? null : c.id;
+        document.querySelectorAll('#globeLegend button').forEach((x) => x.classList.remove('off'));
+        for (const m of nodeMeshes) {
+          const vis = (active == null) || (m.userData.cluster === active);
+          m.material.opacity = vis ? 1 : 0.08;
+          if (m.userData._label) m.userData._label.element.style.opacity = vis ? '1' : '0.08';
+        }
+        if (active != null) {
+          document.querySelectorAll('#globeLegend button').forEach((x, i) => {
+            if ((data.clusters[i] || {}).id !== active) x.classList.add('off');
+          });
+        }
+      });
+      box.appendChild(b);
+    }
+  })();
 
   document.getElementById('globeSearch').addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
