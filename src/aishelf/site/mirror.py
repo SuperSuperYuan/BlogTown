@@ -69,3 +69,77 @@ def build_messages(profile: "Profile") -> list[dict]:
         f"高频作者：{authors}。"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def _collected_key(raw: str):
+    """ISO collected_at -> naive-UTC datetime; unparseable sorts last.
+
+    Same tolerant logic as digest._collected_key (kept local so mirror stays a
+    leaf module — no cross-import)."""
+    try:
+        dt = datetime.fromisoformat(raw or "")
+    except ValueError:
+        return datetime.min
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def load_profile(db_path, *, recent_n: int = 10):
+    """Build a Profile from the derived DB, or None when there are no clustered
+    items / no DB. Tolerant of a missing/old DB (returns None, never raises) —
+    same posture as db.search.hooks_for / collide.load_pair_space."""
+    try:
+        con = schema.connect(db_path)
+        try:
+            schema.init_db(con)
+            clusters = {
+                r["id"]: (r["name"] or "", r["color"] or "")
+                for r in con.execute("SELECT id, name, color FROM clusters")
+            }
+            rows = con.execute(
+                "SELECT id, type, author, collected_at, title, cluster "
+                "FROM items WHERE cluster IS NOT NULL"
+            ).fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return None
+    if not rows:
+        return None
+
+    ordered = sorted(
+        rows, key=lambda r: (_collected_key(r["collected_at"] or ""), r["id"]),
+        reverse=True,
+    )
+    recent_ids = {r["id"] for r in ordered[:recent_n]}
+
+    by_cluster: dict[int, list] = {}
+    for r in rows:
+        by_cluster.setdefault(r["cluster"], []).append(r)
+
+    galaxies = []
+    for cid, members in by_cluster.items():
+        name, color = clusters.get(cid, ("", ""))
+        recent = sum(1 for m in members if m["id"] in recent_ids)
+        titles = [m["title"] for m in members[:5]]
+        galaxies.append(Galaxy(name=name, color=color, size=len(members),
+                               recent=recent, titles=titles))
+    galaxies.sort(key=lambda g: (-g.size, g.name))
+
+    videos = sum(1 for r in rows if r["type"] == "video")
+    blogs = sum(1 for r in rows if r["type"] == "blog")
+
+    author_counts: dict[str, int] = {}
+    for r in rows:
+        a = (r["author"] or "").strip()
+        if a:
+            author_counts[a] = author_counts.get(a, 0) + 1
+    top_authors = sorted(author_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+
+    dts = [_collected_key(r["collected_at"] or "") for r in rows]
+    dts = [d for d in dts if d != datetime.min]
+    span_days = (max(dts) - min(dts)).days if len(dts) >= 2 else 0
+
+    return Profile(galaxies=galaxies, total=len(rows), videos=videos, blogs=blogs,
+                   top_authors=top_authors, span_days=span_days, recent_n=recent_n)
