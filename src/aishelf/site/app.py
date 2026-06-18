@@ -31,6 +31,7 @@ from aishelf.site import (
     collect,
     hermes,
     items,
+    learn,
     llm,
     markdown,
     mirror,
@@ -382,6 +383,10 @@ class _PathRequest(BaseModel):
     ids: list[str] = Field(default_factory=list)
 
 
+class _LearnRequest(BaseModel):
+    cluster_id: int
+
+
 @app.get("/collect", response_class=HTMLResponse)
 def collect_page(request: Request, q: str = ""):
     return templates.TemplateResponse(
@@ -491,6 +496,38 @@ def mirror_chat():
             return
         yield hermes.sse({"profile": _profile_payload(profile)})
         yield from llm.stream_completion(mirror.build_messages(profile))
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.get("/learn", response_class=HTMLResponse)
+def learn_page(request: Request):
+    galaxies = learn.load_galaxies(default_db_path(get_data_dir()))
+    galaxies_json = [
+        {"id": g.id, "items": [{"id": it.id, "title": it.title, "type": it.type}
+                               for it in g.items]}
+        for g in galaxies
+    ]
+    return templates.TemplateResponse(
+        request, "learn.html", {"galaxies": galaxies, "galaxies_json": galaxies_json}
+    )
+
+
+@app.post("/learn/route")
+def learn_route(req: _LearnRequest):
+    # Ungated: synthesis is cheap (like /ask, /collide, /mirror), not the Hermes path.
+    galaxies = learn.load_galaxies(default_db_path(get_data_dir()))
+    galaxy = next((g for g in galaxies if g.id == req.cluster_id), None)
+
+    def _gen():
+        if galaxy is None or not galaxy.items:
+            yield hermes.sse({"error": "这个星系还没有内容"})
+            yield hermes.sse({"done": True})
+            return
+        yield hermes.sse({"galaxy": {"id": galaxy.id, "name": galaxy.name}})
+        item_dicts = [{"id": it.id, "title": it.title, "summary": it.summary, "type": it.type}
+                      for it in galaxy.items]
+        yield from llm.stream_completion(learn.build_messages(galaxy.name, item_dicts))
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
 

@@ -100,6 +100,10 @@ Source layout uses a `src/` directory; package is `aishelf`.
   stats (type/author/time span, recent-window per galaxy); mirrors
   collide.py/digest.py's pure-logic split; reuses `ATLAS_CHAT_*` via `llm`; no
   LLM at load time, no persistence),
+  `learn.py` (进阶路线: pure `build_messages` + tolerant `load_galaxies` — reads
+  the `clusters`/`items` derived tables into galaxies-with-items and phrases an
+  ordered 中文 学习路线 over a chosen galaxy; mirrors collide.py/mirror.py's split;
+  streamed by `POST /learn/route`, no persistence/new config),
   `templates/`, `static/`, `__main__.py`.
 - `aishelf/db/` — derived SQLite index of the contract files: `config.py`
   (`default_db_path`), `schema.py` (`items` table + FTS5 `items_fts`, plus
@@ -201,7 +205,12 @@ surprising pair (embedding cosine mid-band) and streams a three-part 中文 synt
 `GET /mirror` renders the 藏书镜 page; `POST /mirror/chat` builds a collection
 profile from the theme galaxies and streams a 中文 阅读人格 portrait (主线/转向/盲区/
 人格 + 一条只从已有收藏延伸的建议); ungated like /collide, and degrades to a friendly
-empty state when no clusters exist. Initial
+empty state when no clusters exist.
+`GET /learn` renders the 进阶路线 page (server-rendered galaxy pills + embedded
+per-galaxy item ids for client-side title→link matching); `POST /learn/route`
+streams an ordered 入门→进阶→纵深 学习路线 over the chosen galaxy's items via
+`llm.stream_completion` (ungated like /ask; unknown/empty cluster → error event).
+Initial
 deployment must run one `python -m aishelf.db sync --rebuild` to populate all
 columns including `note`, backfill embeddings (when `ATLAS_EMBED_*` is
 configured) for hybrid `/ask` retrieval, backfill the `edges` table,
