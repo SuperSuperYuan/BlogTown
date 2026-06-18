@@ -71,3 +71,17 @@ def test_critique_unknown_id_404(client):
 
 def test_critique_unsafe_id_404(client):
     assert client.post("/critique/a..b").status_code == 404
+
+
+def test_video_detail_has_critique_button(client):
+    r = client.get("/videos/youtube-aaa")
+    assert r.status_code == 200
+    assert "唱个反调" in r.text
+    assert "/critique/" in r.text
+
+
+def test_blog_detail_has_critique_button(client):
+    r = client.get("/blogs/blog-ccc")
+    assert r.status_code == 200
+    assert "唱个反调" in r.text
+    assert "/critique/" in r.text
