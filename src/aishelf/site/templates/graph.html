@@ -229,7 +229,7 @@
       hovered = null;
       tip.hidden = true;
       renderer.domElement.style.cursor = 'grab';
-      controls.autoRotate = true;
+      if (!currentMode) controls.autoRotate = true;   // a mode owns autoRotate while active
     }
   });
   renderer.domElement.addEventListener('click', () => {
@@ -315,6 +315,11 @@
     exitMode = null; frameHook = null; currentMode = null;
     document.querySelectorAll('#verbPill button').forEach((b) => b.classList.remove('on'));
     restoreAll();
+    // reset the resting filters so the chrome agrees with the now-full graph
+    document.querySelectorAll('#globeFilters button').forEach((x) => x.classList.toggle('on', x.dataset.f === 'all'));
+    document.querySelectorAll('#globeLegend button').forEach((x) => x.classList.remove('off'));
+    legendActive = null;
+    document.getElementById('globeSearch').value = '';
     controls.autoRotate = true;
   }
   function setMode(name) {
@@ -437,7 +442,7 @@
       hold -= dt;
       if (hold <= 0) { hold = HOLD; go(next()); }
     };
-    return function exit() { cap.classList.remove('show'); };
+    return function exit() { cap.classList.remove('show'); controls.target.set(0, 0, 0); };
   };
 
   // ---- E 语义路径 ----
@@ -508,7 +513,7 @@
       mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
       ray.setFromCamera(mouse, camera);
-      const hit = ray.intersectObjects(nodeMeshes)[0];
+      const hit = ray.intersectObjects(nodeMeshes.filter((m) => m.material.opacity > 0.5))[0];
       if (!hit) return;
       const id = hit.object.userData.id;
       if (a == null) { a = id; hint.textContent = '已选起点，再点一颗终点星'; return; }
