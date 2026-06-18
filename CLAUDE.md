@@ -58,7 +58,7 @@ Source layout uses a `src/` directory; package is `aishelf`.
 - `aishelf/site/` — `app.py` (routes + scheduler lifespan; browse/home/author
   routes surface per-item hooks via a `_hooks_for` helper that bridges
   `db_search.hooks_for` into the file-rendered lists), `views.py` (pure
-  filter/search/paginate), `hermes.py` (Hermes connection + robust SSE
+  filter/search/paginate/`keyword_counts`), `hermes.py` (Hermes connection + robust SSE
   `stream_chat`), `collect.py` (system-prompt builder + non-streaming
   `run_once`), `ask.py` (RAG core for `/ask`: `retrieve` — hybrid vector + FTS5
   when `ATLAS_EMBED_*` is configured, pure FTS5 fallback otherwise; `build_messages`,
@@ -189,7 +189,11 @@ of the item — and of the user's note when present — via `llm.stream_completi
 shown in a 抬杠 panel on the detail page (shared `_critique.html` partial; ungated
 like /ask; `safe_id` guard, unknown/unsafe id → 404); never persisted.
 The read-only `GET /api/search?q=&type=&page=` endpoint queries it; existing
-browse/search pages still read files. `GET /graph` renders the semantic
+browse/search pages still read files.
+`GET /keywords` renders a corpus-wide 标签云 (tag cloud sized by frequency, pure
+data, no LLM) via `views.keyword_counts`; `GET /keyword/{kw}` lists all items
+(videos + blogs) carrying a tag (cross-type, reusing `views.by_keyword`; 404 when
+none) — complementing the existing per-section `?keyword=` filter. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
 surface by PCA of embeddings, colored by theme galaxy with floating galaxy labels
   + a color legend, glowing arcs for edges, alias labels; OrbitControls
