@@ -508,14 +508,29 @@
         }
       } catch (e) { text.textContent = '解说服务暂时不可用'; }
     }
-    function onPick(ev) {
+    // Nearest visible node within a screen-space tolerance — far more forgiving
+    // than exact sprite raycasting (the dots are tiny), so a click "near" a star
+    // selects it. Front-most wins on ties (smaller projected depth).
+    function pickNear(ev) {
       const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-      ray.setFromCamera(mouse, camera);
-      const hit = ray.intersectObjects(nodeMeshes.filter((m) => m.material.opacity > 0.5))[0];
-      if (!hit) return;
-      const id = hit.object.userData.id;
+      const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
+      const v = new THREE.Vector3();
+      let best = null, bestScore = Infinity;
+      for (const m of nodeMeshes) {
+        if (m.material.opacity <= 0.5) continue;        // skip dimmed (e.g. after a route)
+        v.copy(m.position).project(camera);
+        if (v.z > 1) continue;                          // behind the camera
+        const sx = (v.x * 0.5 + 0.5) * rect.width, sy = (-v.y * 0.5 + 0.5) * rect.height;
+        const d = Math.hypot(sx - px, sy - py);
+        if (d > 26) continue;                           // 26px hit radius
+        const score = d + (v.z + 1) * 4;                // tie-break: prefer the front-most
+        if (score < bestScore) { bestScore = score; best = m; }
+      }
+      return best ? best.userData.id : null;
+    }
+    function onPick(ev) {
+      const id = pickNear(ev);
+      if (!id) return;
       if (a == null) { a = id; hint.textContent = '已选起点，再点一颗终点星'; return; }
       if (id === a) return;
       const route = dijkstra(a, id);
