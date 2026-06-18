@@ -35,6 +35,7 @@ from aishelf.site import (
     markdown,
     mirror,
     notes,
+    notedraft,
     path,
     posts,
     schedule_state,
@@ -616,6 +617,24 @@ def save_note_route(item_id: str, req: _NoteRequest):
     # The note text feeds search; refresh the derived index off-thread.
     _sync_db_async(get_data_dir())
     return {"ok": True, "updated_at": updated_at, "html": markdown.render_markdown(req.text)}
+
+
+@app.post("/notes/{item_id}/draft")
+def note_draft(item_id: str):
+    # Ungated: drafting is cheap (like /ask, /collide, /mirror), not the Hermes path.
+    try:
+        items.safe_id(item_id)
+    except ValueError:
+        raise HTTPException(status_code=404)
+    it = next((x for x in _items() if x.id == item_id), None)
+    if it is None:
+        raise HTTPException(status_code=404)
+    existing = _note_for(it)
+
+    def _gen():
+        yield from llm.stream_completion(notedraft.build_messages(_item_dict(it), existing))
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 @app.post("/delete/{item_id}")
