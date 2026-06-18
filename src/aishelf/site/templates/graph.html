@@ -17,7 +17,7 @@
   <div id="globe" class="globe-canvas"></div>
   <div class="verb-pill" id="verbPill">
     <button type="button" data-mode="replay">▶ 回放</button>
-    <button type="button" disabled title="即将上线">🛸 逛逛</button>
+    <button type="button" data-mode="tour">🛸 逛逛</button>
     <button type="button" disabled title="即将上线">🔗 路径</button>
   </div>
   <div class="replay-bar" id="replayBar">
@@ -25,6 +25,7 @@
     <input type="range" id="replayRange" min="0" max="1000" value="1000" />
     <span class="date" id="replayDate"></span>
   </div>
+  <div class="tour-cap" id="tourCap"></div>
   <div id="globeTip" class="globe-tip" hidden></div>
   <div id="globeEmpty" class="globe-empty" hidden>
     图谱暂时没有数据。先在 <a href="/collect">Hermes</a> 采集内容，配置好 embedding 服务后运行一次
@@ -70,6 +71,12 @@
   .replay-bar input[type=range] { width: 220px; }
   .replay-bar .play { cursor: pointer; width: 26px; text-align: center; user-select: none; }
   .replay-bar .date { min-width: 88px; font-variant-numeric: tabular-nums; }
+  .tour-cap { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+    display: none; max-width: 60%; text-align: center; background: rgba(10,15,30,.9);
+    border: 1px solid #24365f; border-radius: 12px; padding: 10px 16px; z-index: 3;
+    color: #e7eefb; font-size: 14px; line-height: 1.6; }
+  .tour-cap.show { display: block; }
+  .tour-cap b { color: #9fc6ff; }
 </style>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -363,6 +370,62 @@
       bar.classList.remove('show');
       playBtn.onclick = null; range.oninput = null;
     };
+  };
+
+  // ---- D 语义漫游 ----
+  MODES.tour = function () {
+    const cap = document.getElementById('tourCap');
+    const ids = data.nodes.map((n) => n.id);
+    const visited = new Set();
+    const HOLD = 3000;            // ms dwell per node
+    let cur = ids[Math.floor(Math.random() * ids.length)] || null;
+    let hold = HOLD, last = performance.now(), lastCluster = null;
+    const target = new THREE.Vector3();
+    cap.classList.add('show');
+
+    function clusterName(cid) {
+      const c = (data.clusters || []).find((x) => x.id === cid);
+      return c ? c.name : '';
+    }
+    function go(id) {
+      if (!id || !meshOf[id]) return;
+      visited.add(id); cur = id;
+      const n = meshOf[id].userData;
+      let html = '';
+      const cn = clusterName(n.cluster);
+      if (cn && n.cluster !== lastCluster) { html += '进入「<b>' + cn + '</b>」　'; lastCluster = n.cluster; }
+      html += '<b>' + (n.alias || n.title) + '</b>';
+      if (n.hook) html += '<br>' + n.hook;
+      cap.innerHTML = html;
+      const keep = new Set([id, ...((adj[id] || []).map((e) => e.id))]);
+      for (const m of nodeMeshes) {
+        const on = keep.has(m.userData.id);
+        m.material.opacity = on ? 1 : 0.12;
+        if (m.userData._label) m.userData._label.element.style.opacity = on ? '1' : '0.12';
+      }
+    }
+    function next() {
+      const nbrs = (adj[cur] || []).map((e) => e.id);
+      const fresh = nbrs.filter((i) => !visited.has(i));
+      const pool = fresh.length ? fresh : nbrs;
+      if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+      const rest = ids.filter((i) => !visited.has(i));   // dead end -> jump
+      return (rest.length ? rest : ids)[Math.floor(Math.random() * (rest.length ? rest.length : ids.length))];
+    }
+
+    go(cur);
+    frameHook = function () {
+      const now = performance.now(); const dt = now - last; last = now;
+      const p = posOf[cur];
+      if (p) {
+        controls.target.lerp(p, 0.05);
+        target.copy(p).normalize().multiplyScalar(R * 2.3);
+        camera.position.lerp(target, 0.03);
+      }
+      hold -= dt;
+      if (hold <= 0) { hold = HOLD; go(next()); }
+    };
+    return function exit() { cap.classList.remove('show'); };
   };
 
   function resize() {
