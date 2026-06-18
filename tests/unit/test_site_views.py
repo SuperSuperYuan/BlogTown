@@ -50,3 +50,30 @@ def test_paginate_pages_and_clamp():
 
     empty = views.paginate([], page=1, per_page=2)
     assert empty.items == [] and empty.total == 0 and empty.total_pages == 1
+
+
+from types import SimpleNamespace
+
+
+def _kw_item(*kws):
+    return SimpleNamespace(keywords=list(kws))
+
+
+def test_keyword_counts_groups_case_insensitively_and_sorts():
+    items = [_kw_item("AI", "ml"), _kw_item("ai", "RAG"), _kw_item("ml")]
+    res = views.keyword_counts(items)
+    assert res == [("AI", 2), ("ml", 2), ("RAG", 1)]
+
+
+def test_keyword_counts_dedupes_within_one_item():
+    res = views.keyword_counts([_kw_item("ai", "AI", "ai")])
+    assert res == [("ai", 1)]
+
+
+def test_keyword_counts_empty():
+    assert views.keyword_counts([]) == []
+
+
+def test_keyword_counts_over_fixtures():
+    res = views.keyword_counts(ITEMS)
+    assert dict(res) == {"ai": 1, "llm": 1, "research": 1, "agents": 1}
