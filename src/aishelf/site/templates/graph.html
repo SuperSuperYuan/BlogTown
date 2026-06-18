@@ -18,7 +18,7 @@
   <div class="verb-pill" id="verbPill">
     <button type="button" data-mode="replay">▶ 回放</button>
     <button type="button" data-mode="tour">🛸 逛逛</button>
-    <button type="button" disabled title="即将上线">🔗 路径</button>
+    <button type="button" data-mode="path">🔗 路径</button>
   </div>
   <div class="replay-bar" id="replayBar">
     <span class="play" id="replayPlay">⏸</span>
@@ -26,6 +26,10 @@
     <span class="date" id="replayDate"></span>
   </div>
   <div class="tour-cap" id="tourCap"></div>
+  <div class="path-panel" id="pathPanel">
+    <div class="path-hint" id="pathHint">点两颗星，看它们怎么连起来</div>
+    <div class="path-text" id="pathText"></div>
+  </div>
   <div id="globeTip" class="globe-tip" hidden></div>
   <div id="globeEmpty" class="globe-empty" hidden>
     图谱暂时没有数据。先在 <a href="/collect">Hermes</a> 采集内容，配置好 embedding 服务后运行一次
@@ -77,6 +81,13 @@
     color: #e7eefb; font-size: 14px; line-height: 1.6; }
   .tour-cap.show { display: block; }
   .tour-cap b { color: #9fc6ff; }
+  .path-panel { position: absolute; right: 16px; top: 68px; width: 300px; max-height: 60%;
+    display: none; flex-direction: column; gap: 8px; background: rgba(8,14,28,.94);
+    border: 1px solid #24365f; border-radius: 12px; padding: 12px 14px; z-index: 3;
+    color: #e7eefb; font-size: 13px; line-height: 1.7; overflow: auto; }
+  .path-panel.show { display: flex; }
+  .path-hint { color: #9fb0d4; font-size: 12px; }
+  .path-text { white-space: pre-wrap; }
 </style>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -222,6 +233,7 @@
     }
   });
   renderer.domElement.addEventListener('click', () => {
+    if (currentMode === 'path') return;   // path mode owns clicks (star picking)
     if (hovered && hovered.userData.href) window.open(hovered.userData.href, '_blank', 'noopener');
   });
 
@@ -426,6 +438,91 @@
       if (hold <= 0) { hold = HOLD; go(next()); }
     };
     return function exit() { cap.classList.remove('show'); };
+  };
+
+  // ---- E 语义路径 ----
+  MODES.path = function () {
+    const panel = document.getElementById('pathPanel');
+    const hint = document.getElementById('pathHint');
+    const text = document.getElementById('pathText');
+    panel.classList.add('show'); hint.textContent = '点第一颗星'; text.textContent = '';
+    let a = null, lineObj = null;
+
+    function dijkstra(src, dst) {
+      const dist = { [src]: 0 }, prev = {}, seen = new Set();
+      const pq = [[0, src]];
+      while (pq.length) {
+        pq.sort((x, y) => x[0] - y[0]);
+        const [d, u] = pq.shift();
+        if (u === dst) break;
+        if (seen.has(u)) continue; seen.add(u);
+        for (const e of (adj[u] || [])) {
+          const nd = d + (1 - e.w);          // stronger edge (higher w) = shorter
+          if (dist[e.id] == null || nd < dist[e.id]) { dist[e.id] = nd; prev[e.id] = u; pq.push([nd, e.id]); }
+        }
+      }
+      if (dst !== src && prev[dst] == null) return null;
+      const route = [dst]; let c = dst;
+      while (c !== src) { c = prev[c]; if (c == null) return null; route.unshift(c); }
+      return route;
+    }
+    function clearLine() {
+      if (lineObj) { scene.remove(lineObj); lineObj.geometry.dispose(); lineObj.material.dispose(); lineObj = null; }
+    }
+    function drawRoute(route) {
+      clearLine();
+      const pts = route.map((id) => posOf[id]).filter(Boolean);
+      lineObj = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0x6cf0ff, transparent: true, opacity: 0.9 }));
+      scene.add(lineObj);
+      const keep = new Set(route);
+      for (const m of nodeMeshes) {
+        const on = keep.has(m.userData.id);
+        m.material.opacity = on ? 1 : 0.08;
+        if (m.userData._label) m.userData._label.element.style.opacity = on ? '1' : '0.08';
+      }
+    }
+    async function explain(route) {
+      try {
+        const resp = await fetch('/graph/path', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: route }),
+        });
+        const reader = resp.body.getReader(), dec = new TextDecoder();
+        let buf = ''; text.textContent = '';
+        while (true) {
+          const { done, value } = await reader.read(); if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n'); buf = lines.pop();
+          for (const ln of lines) {
+            if (!ln.startsWith('data: ')) continue;
+            const ev = JSON.parse(ln.slice(6));
+            if (ev.delta) text.textContent += ev.delta;
+            if (ev.error) text.textContent = ev.error;
+          }
+        }
+      } catch (e) { text.textContent = '解说服务暂时不可用'; }
+    }
+    function onPick(ev) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      ray.setFromCamera(mouse, camera);
+      const hit = ray.intersectObjects(nodeMeshes)[0];
+      if (!hit) return;
+      const id = hit.object.userData.id;
+      if (a == null) { a = id; hint.textContent = '已选起点，再点一颗终点星'; return; }
+      if (id === a) return;
+      const route = dijkstra(a, id);
+      if (!route) { hint.textContent = '这两颗星之间暂无语义通路，换一对试试'; a = null; return; }
+      hint.textContent = '路径：' + route.length + ' 颗星 · 解说中…';
+      drawRoute(route); explain(route); a = null;
+    }
+    renderer.domElement.addEventListener('click', onPick);
+    return function exit() {
+      panel.classList.remove('show'); clearLine();
+      renderer.domElement.removeEventListener('click', onPick);
+    };
   };
 
   function resize() {
