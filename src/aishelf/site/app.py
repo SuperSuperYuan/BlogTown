@@ -349,6 +349,20 @@ def author_page(request: Request, key: str):
     )
 
 
+@app.get("/keyword/{kw}", response_class=HTMLResponse)
+def keyword_page(request: Request, kw: str):
+    mine = views.by_keyword(_items(), kw)
+    if not mine:
+        raise HTTPException(status_code=404)
+    vids = views.videos(mine)
+    blogs = views.blogs(mine)
+    return templates.TemplateResponse(
+        request,
+        "keyword.html",
+        {"kw": kw, "videos": vids, "blogs": blogs, "hooks": _hooks_for(vids + blogs)},
+    )
+
+
 @app.get("/search", response_class=HTMLResponse)
 def search_page(request: Request, q: str = "", page: int = 1):
     results = views.search(_items(), q)
