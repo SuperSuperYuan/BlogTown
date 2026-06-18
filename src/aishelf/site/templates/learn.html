@@ -36,8 +36,9 @@
       if (!hit) return escapeHtml(line);
       const href = (hit.type === "video" ? "/videos/" : "/blogs/") + encodeURIComponent(hit.id);
       const esc = escapeHtml(line);
-      return esc.replace(escapeHtml(hit.title),
-        '<a href="' + href + '">' + escapeHtml(hit.title) + "</a>");
+      const safeTitle = escapeHtml(hit.title);
+      // function replacement so a title with `$&`/`$1`-style chars isn't reinterpreted
+      return esc.replace(safeTitle, () => '<a href="' + href + '">' + safeTitle + "</a>");
     }).join("<br>");
     resultEl.innerHTML = html;
   }
