@@ -327,3 +327,17 @@ main:has(.write) { max-width: 1280px; }
 .timeline .tl-hook { color: #7b8794; font-size: 13px; }
 .timeline .tl-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; padding-top: 14px; border-top: 1px solid #2a2f37; }
 .timeline .tl-leg { display: inline-flex; align-items: center; gap: 6px; color: #9aa5b1; font-size: 13px; }
+
+.islands h1 .hint { font-size: .5em; font-weight: 400; color: #8a8f98; margin-left: .5em; }
+.islands .il-stats { color: #9aa5b1; font-size: 14px; margin: 6px 0 22px; }
+.islands .il-head { font-size: 15px; color: #cdd3da; border-bottom: 1px solid #2a2f37; padding-bottom: 6px; margin: 26px 0 10px; }
+.islands .il-sub { font-size: .75em; color: #8a8f98; margin-left: .4em; }
+.islands .il-list { list-style: none; padding: 0; margin: 0; }
+.islands .il-list li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; padding: 5px 0; }
+.islands .il-mark { color: #6b7280; flex: 0 0 auto; font-size: 10px; }
+.islands .il-title { color: #cdd3da; text-decoration: none; }
+.islands .il-title:hover { color: #8ab4ff; }
+.islands .il-hook { color: #7b8794; font-size: 13px; }
+.islands .il-nbrs { color: #7b8794; font-size: 12px; flex-basis: 100%; padding-left: 18px; }
+.islands .il-nbrs a { color: #9aa5b1; text-decoration: none; }
+.islands .il-nbrs a:hover { color: #8ab4ff; }
