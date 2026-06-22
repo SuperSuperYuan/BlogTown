@@ -56,6 +56,27 @@ def by_keyword(items: list[ContentItem], kw: str) -> list[ContentItem]:
     return [it for it in items if any(needle == k.lower() for k in it.keywords)]
 
 
+def keyword_counts(items: list) -> list[tuple[str, int]]:
+    """All distinct keywords with how many items carry each (case-insensitive
+    grouping; a keyword repeated within one item counts once). Returns
+    (display, count) sorted by count desc then display (case-insensitive) asc;
+    `display` is the first-seen original casing for that lower-cased key."""
+    counts: dict[str, int] = {}
+    display: dict[str, str] = {}
+    for it in items:
+        seen: set[str] = set()
+        for k in getattr(it, "keywords", None) or []:
+            key = k.strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            counts[key] = counts.get(key, 0) + 1
+            display.setdefault(key, k)
+    pairs = [(display[k], counts[k]) for k in counts]
+    pairs.sort(key=lambda p: (-p[1], p[0].lower()))
+    return pairs
+
+
 def author_key(item: ContentItem) -> str:
     return getattr(item, "author_id", None) or item.author
 

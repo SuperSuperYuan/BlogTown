@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}关键词宇宙 · Atlas{% endblock %}
+{% block content %}
+<section class="kw-cloud">
+  <h1>关键词宇宙 <span class="hint">点一个标签，看看它串起了哪些内容</span></h1>
+  {% if tags %}
+  <div class="tagcloud">
+    {% for kw, count in tags %}
+    <a href="/keyword/{{ kw|urlencode }}" style="font-size: {{ (0.85 + 1.25 * count / max_count)|round(2) }}rem">{{ kw }}<span class="tc-count">{{ count }}</span></a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">还没有关键词——采集一些内容后再来。</p>
+  {% endif %}
+</section>
+{% endblock %}
