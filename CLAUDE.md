@@ -103,6 +103,10 @@ Source layout uses a `src/` directory; package is `aishelf`.
   month buckets with per-item galaxy color/hook + a stats header + color legend; tolerant
   `load_timeline` reads the derived items/clusters tables; mirrors digest.py/learn.py's
   pure + IO split; no LLM/persistence/new config),
+  `islands.py` (语义孤岛/孤本: pure `build_islands` splits embedded items by their
+  `edges`-graph degree into 孤本 (0) / 弱连接 (1–2 neighbors) / connected, resolving
+  neighbor titles; tolerant `load_islands` reads embedded items + edges; mirrors
+  timeline.py's pure + IO split; no LLM/persistence/new config),
   `mirror.py` (藏书镜: pure `build_messages` + tolerant `load_profile` — reads the
   `clusters`/`items` derived tables into a Profile of theme galaxies + corpus
   stats (type/author/time span, recent-window per galaxy); mirrors
@@ -201,7 +205,11 @@ none) — complementing the existing per-section `?keyword=` filter.
 `GET /timeline` renders the 收藏编年史 — all items as a month-grouped
 reverse-chronological vertical timeline (galaxy-colored dot + title link + hook),
 with a stats header (总数/跨度/最活跃星系) and color legend; pure data from the
-derived DB (`timeline.load_timeline`), no LLM, friendly empty state. `GET /graph` renders the semantic
+derived DB (`timeline.load_timeline`), no LLM, friendly empty state.
+`GET /islands` renders the 语义孤岛/孤本 — embedded items ranked by their
+`edges`-graph degree (孤本 = degree 0, 弱连接 = 1–2 neighbors with neighbor
+links); pure data from the derived DB (`islands.load_islands`), no LLM; degrades
+to a config notice when no embeddings exist. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
 surface by PCA of embeddings, colored by theme galaxy with floating galaxy labels
   + a color legend, glowing arcs for edges, alias labels; OrbitControls

@@ -31,6 +31,7 @@ from aishelf.site import (
     collect,
     critique,
     hermes,
+    islands,
     items,
     learn,
     llm,
@@ -377,6 +378,12 @@ def keywords_page(request: Request):
 def timeline_page(request: Request):
     data = timeline.load_timeline(default_db_path(get_data_dir()))
     return templates.TemplateResponse(request, "timeline.html", {"data": data})
+
+
+@app.get("/islands", response_class=HTMLResponse)
+def islands_page(request: Request):
+    data = islands.load_islands(default_db_path(get_data_dir()))
+    return templates.TemplateResponse(request, "islands.html", {"data": data})
 
 
 @app.get("/search", response_class=HTMLResponse)
