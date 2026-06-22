@@ -44,3 +44,18 @@ def test_keywords_index_renders_cloud(client):
 def test_topbar_has_keywords_link(client):
     r = client.get("/keywords")
     assert 'href="/keywords"' in r.text
+
+
+def test_keyword_page_shows_cotags(client):
+    # blog-ccc carries both "llm" and "research" -> they co-occur
+    r = client.get("/keyword/llm")
+    assert r.status_code == 200
+    assert "常一起出现" in r.text
+    assert "/keyword/research" in r.text
+
+
+def test_keyword_page_no_cotags_for_singleton(client):
+    # "agents" only on blog-ddd, alone -> no co-occurrence row
+    r = client.get("/keyword/agents")
+    assert r.status_code == 200
+    assert "常一起出现" not in r.text

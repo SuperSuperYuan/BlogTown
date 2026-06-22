@@ -2,6 +2,9 @@
 {% block title %}标签「{{ kw }}」· Atlas{% endblock %}
 {% block content %}
 <h1>标签「{{ kw }}」</h1>
+{% if co_tags %}
+<p class="cotags">常一起出现：{% for k, c in co_tags %}<a href="/keyword/{{ k|urlencode }}">{{ k }}<span class="ct-count">{{ c }}</span></a>{% endfor %}</p>
+{% endif %}
 {% if videos %}<h2>视频</h2><div class="grid">{% for it in videos %}{% include "_video_card.html" %}{% endfor %}</div>{% endif %}
 {% if blogs %}<h2>博客</h2><ul class="bloglist">{% for it in blogs %}{% include "_blog_row.html" %}{% endfor %}</ul>{% endif %}
 {% endblock %}
