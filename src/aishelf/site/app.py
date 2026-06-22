@@ -358,10 +358,12 @@ def keyword_page(request: Request, kw: str):
         raise HTTPException(status_code=404)
     vids = views.videos(mine)
     blogs = views.blogs(mine)
+    co_tags = views.co_keywords(mine, kw)
     return templates.TemplateResponse(
         request,
         "keyword.html",
-        {"kw": kw, "videos": vids, "blogs": blogs, "hooks": _hooks_for(vids + blogs)},
+        {"kw": kw, "videos": vids, "blogs": blogs,
+         "hooks": _hooks_for(vids + blogs), "co_tags": co_tags},
     )
 
 

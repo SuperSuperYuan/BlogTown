@@ -201,7 +201,9 @@ browse/search pages still read files.
 `GET /keywords` renders a corpus-wide 标签云 (tag cloud sized by frequency, pure
 data, no LLM) via `views.keyword_counts`; `GET /keyword/{kw}` lists all items
 (videos + blogs) carrying a tag (cross-type, reusing `views.by_keyword`; 404 when
-none) — complementing the existing per-section `?keyword=` filter.
+none) — complementing the existing per-section `?keyword=` filter. The
+`/keyword/{kw}` page also shows a 「常一起出现」 co-occurring-tags row
+(`views.co_keywords`, pure, no LLM) linking to sibling tag pages.
 `GET /timeline` renders the 收藏编年史 — all items as a month-grouped
 reverse-chronological vertical timeline (galaxy-colored dot + title link + hook),
 with a stats header (总数/跨度/最活跃星系) and color legend; pure data from the

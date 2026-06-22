@@ -77,6 +77,32 @@ def keyword_counts(items: list) -> list[tuple[str, int]]:
     return pairs
 
 
+CO_TAGS_LIMIT = 12
+
+
+def co_keywords(items, kw, *, limit: int = CO_TAGS_LIMIT) -> list[tuple[str, int]]:
+    """Keywords that co-occur with `kw` among `items` (already carrying `kw`).
+
+    Case-insensitive grouping, deduped per item, excludes `kw` itself; sorted by
+    count desc then display (case-insensitive) asc; capped to `limit`. Mirrors
+    keyword_counts. Returns (display, count) pairs."""
+    needle = (kw or "").strip().lower()
+    counts: dict[str, int] = {}
+    display: dict[str, str] = {}
+    for it in items:
+        seen: set[str] = set()
+        for k in getattr(it, "keywords", None) or []:
+            key = k.strip().lower()
+            if not key or key == needle or key in seen:
+                continue
+            seen.add(key)
+            counts[key] = counts.get(key, 0) + 1
+            display.setdefault(key, k)
+    pairs = [(display[k], counts[k]) for k in counts]
+    pairs.sort(key=lambda p: (-p[1], p[0].lower()))
+    return pairs[:limit]
+
+
 def author_key(item: ContentItem) -> str:
     return getattr(item, "author_id", None) or item.author
 

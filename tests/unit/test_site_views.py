@@ -77,3 +77,35 @@ def test_keyword_counts_empty():
 def test_keyword_counts_over_fixtures():
     res = views.keyword_counts(ITEMS)
     assert dict(res) == {"ai": 1, "llm": 1, "research": 1, "agents": 1}
+
+
+def test_co_keywords_counts_and_sorts():
+    items = [_kw_item("rag", "eval"), _kw_item("rag", "eval"), _kw_item("rag", "vec")]
+    assert views.co_keywords(items, "rag") == [("eval", 2), ("vec", 1)]
+
+
+def test_co_keywords_excludes_focus_any_case():
+    assert views.co_keywords([_kw_item("AI", "ml")], "ai") == [("ml", 1)]
+
+
+def test_co_keywords_case_insensitive_first_seen_display():
+    items = [_kw_item("rag", "Eval"), _kw_item("rag", "eval")]
+    assert views.co_keywords(items, "rag") == [("Eval", 2)]
+
+
+def test_co_keywords_dedupes_within_item():
+    assert views.co_keywords([_kw_item("rag", "eval", "eval")], "rag") == [("eval", 1)]
+
+
+def test_co_keywords_tie_break_by_display():
+    items = [_kw_item("rag", "zeta"), _kw_item("rag", "alpha")]
+    assert views.co_keywords(items, "rag") == [("alpha", 1), ("zeta", 1)]
+
+
+def test_co_keywords_limit():
+    items = [_kw_item("rag", "a", "b", "c")]
+    assert len(views.co_keywords(items, "rag", limit=2)) == 2
+
+
+def test_co_keywords_empty_when_only_focus():
+    assert views.co_keywords([_kw_item("rag"), _kw_item("RAG")], "rag") == []
