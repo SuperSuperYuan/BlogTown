@@ -2,15 +2,17 @@
 {% block title %}关键词宇宙 · Atlas{% endblock %}
 {% block content %}
 <section class="kw-cloud">
+  <p class="eyebrow">STAR MAP · 标签星图</p>
   <h1>关键词宇宙 <span class="hint">点一个标签，看看它串起了哪些内容</span></h1>
   {% if tags %}
+  <p class="kw-readout">{{ tags|length }} 个标签 · 最亮 {{ max_count }} 次出现 · 字号即频次</p>
   <div class="tagcloud">
     {% for kw, count in tags %}
-    <a href="/keyword/{{ kw|urlencode }}" style="font-size: {{ (0.85 + 1.25 * count / max_count)|round(2) }}rem">{{ kw }}<span class="tc-count">{{ count }}</span></a>
+    <a href="/keyword/{{ kw|urlencode }}" style="font-size: {{ (0.9 + 1.35 * count / max_count)|round(2) }}rem">{{ kw }}<span class="tc-count">{{ count }}</span></a>
     {% endfor %}
   </div>
   {% else %}
-  <p class="empty">还没有关键词——采集一些内容后再来。</p>
+  <p class="empty">这片天空还是空的——<a href="/collect">采集一些内容</a>，标签就会亮起来。</p>
   {% endif %}
 </section>
 {% endblock %}

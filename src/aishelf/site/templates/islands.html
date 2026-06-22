@@ -2,16 +2,21 @@
 {% block title %}语义孤岛 · Atlas{% endblock %}
 {% block content %}
 <section class="islands">
+  <p class="eyebrow">LONE STARS · 孤星目录</p>
   <h1>语义孤岛 <span class="hint">最孤立、最独特的收藏</span></h1>
   {% if data.stats.embedded %}
-  <p class="il-stats">已嵌入 {{ data.stats.embedded }} 条 · 孤本 {{ data.stats.lone }} · 弱连接 {{ data.stats.weak }}</p>
+  <p class="il-stats">
+    <span class="tl-stat">已嵌入 <b>{{ data.stats.embedded }}</b> 条</span>
+    <span class="tl-stat">孤本 <b>{{ data.stats.lone }}</b></span>
+    <span class="tl-stat">弱连接 <b>{{ data.stats.weak }}</b></span>
+  </p>
   {% if data.lone or data.weak %}
     {% if data.lone %}
     <h2 class="il-head">孤本 <span class="il-sub">零连接</span></h2>
-    <ul class="il-list">
+    <ul class="il-list lone">
       {% for it in data.lone %}
       <li>
-        <span class="il-mark">●</span>
+        <span class="il-mark"></span>
         <a class="il-title" href="/{{ 'videos' if it.type == 'video' else 'blogs' }}/{{ it.id }}">{{ it.title }}</a>
         {% if it.hook %}<span class="il-hook">{{ it.hook }}</span>{% endif %}
       </li>
@@ -20,13 +25,13 @@
     {% endif %}
     {% if data.weak %}
     <h2 class="il-head">弱连接 <span class="il-sub">仅 1–2 个邻居</span></h2>
-    <ul class="il-list">
+    <ul class="il-list weak">
       {% for it in data.weak %}
       <li>
-        <span class="il-mark">●</span>
+        <span class="il-mark"></span>
         <a class="il-title" href="/{{ 'videos' if it.type == 'video' else 'blogs' }}/{{ it.id }}">{{ it.title }}</a>
         {% if it.hook %}<span class="il-hook">{{ it.hook }}</span>{% endif %}
-        <span class="il-nbrs">邻居：{% for n in it.neighbors %}<a href="/{{ 'videos' if n.type == 'video' else 'blogs' }}/{{ n.id }}">{{ n.title }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</span>
+        <span class="il-nbrs">邻接 {% for n in it.neighbors %}<a href="/{{ 'videos' if n.type == 'video' else 'blogs' }}/{{ n.id }}">{{ n.title }}</a>{% if not loop.last %}<span class="il-sep">·</span>{% endif %}{% endfor %}</span>
       </li>
       {% endfor %}
     </ul>
@@ -35,7 +40,7 @@
   <p class="empty">你的收藏彼此连接紧密，没有孤岛 🎉</p>
   {% endif %}
   {% else %}
-  <p class="empty">语义孤岛需要先配置 <code>ATLAS_EMBED_*</code> 并运行 <code>python -m aishelf.db sync --rebuild</code> 后才能分析。</p>
+  <p class="empty">孤星目录需要先配置 <code>ATLAS_EMBED_*</code> 并运行 <code>python -m aishelf.db sync --rebuild</code> 后才能绘制。</p>
   {% endif %}
 </section>
 {% endblock %}

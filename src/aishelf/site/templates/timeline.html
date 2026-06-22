@@ -2,12 +2,16 @@
 {% block title %}收藏编年史 · Atlas{% endblock %}
 {% block content %}
 <section class="timeline">
+  <p class="eyebrow">LOGBOOK · 航行日志</p>
   <h1>收藏编年史 <span class="hint">你的收藏，按时间排成一条线</span></h1>
   {% if data.stats.total %}
   <p class="tl-stats">
-    共 {{ data.stats.total }} 条 · 跨度 {{ data.stats.span }}
-    {% if data.stats.top_galaxy %} · 最活跃
-      <span class="tl-dot" style="background: {{ data.stats.top_galaxy.color }}"></span>{{ data.stats.top_galaxy.name }}（{{ data.stats.top_galaxy.count }}）
+    <span class="tl-stat"><b>{{ data.stats.total }}</b> 条</span>
+    <span class="tl-stat">跨度 <b>{{ data.stats.span }}</b></span>
+    {% if data.stats.top_galaxy %}
+    <span class="tl-stat">最活跃
+      <span class="tl-dot" style="--c: {{ data.stats.top_galaxy.color }}"></span>{{ data.stats.top_galaxy.name }}<b>·{{ data.stats.top_galaxy.count }}</b>
+    </span>
     {% endif %}
   </p>
   {% for month in data.months %}
@@ -15,7 +19,7 @@
   <ul class="tl-list">
     {% for it in month['items'] %}
     <li>
-      <span class="tl-dot" style="background: {{ it.cluster_color }}" title="{{ it.cluster_name }}"></span>
+      <span class="tl-dot" style="--c: {{ it.cluster_color }}" title="{{ it.cluster_name }}"></span>
       <a class="tl-title" href="/{{ 'videos' if it.type == 'video' else 'blogs' }}/{{ it.id }}">{{ it.title }}</a>
       {% if it.hook %}<span class="tl-hook">{{ it.hook }}</span>{% endif %}
     </li>
@@ -25,12 +29,12 @@
   {% if data.legend %}
   <div class="tl-legend">
     {% for g in data.legend %}
-    <span class="tl-leg"><span class="tl-dot" style="background: {{ g.color }}"></span>{{ g.name }}</span>
+    <span class="tl-leg"><span class="tl-dot" style="--c: {{ g.color }}"></span>{{ g.name }}</span>
     {% endfor %}
   </div>
   {% endif %}
   {% else %}
-  <p class="empty">还没有收藏——<a href="/collect">去采集一些内容</a>再来。</p>
+  <p class="empty">日志还是空白——<a href="/collect">去采集一些内容</a>，时间线就会展开。</p>
   {% endif %}
 </section>
 {% endblock %}
