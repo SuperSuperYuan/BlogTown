@@ -99,6 +99,10 @@ Source layout uses a `src/` directory; package is `aishelf`.
   `digest.py` (今日速读: pure `build_digest` — recent items sorted by `collected_at` + one
   date-seeded older "gem" via `random.Random(today)`, each carrying its A-hook; no LLM/cache;
   rendered as a 今日速读 card at the top of `GET /`),
+  `timeline.py` (收藏编年史: pure `build_timeline` groups items into reverse-chronological
+  month buckets with per-item galaxy color/hook + a stats header + color legend; tolerant
+  `load_timeline` reads the derived items/clusters tables; mirrors digest.py/learn.py's
+  pure + IO split; no LLM/persistence/new config),
   `mirror.py` (藏书镜: pure `build_messages` + tolerant `load_profile` — reads the
   `clusters`/`items` derived tables into a Profile of theme galaxies + corpus
   stats (type/author/time span, recent-window per galaxy); mirrors
@@ -193,7 +197,11 @@ browse/search pages still read files.
 `GET /keywords` renders a corpus-wide 标签云 (tag cloud sized by frequency, pure
 data, no LLM) via `views.keyword_counts`; `GET /keyword/{kw}` lists all items
 (videos + blogs) carrying a tag (cross-type, reusing `views.by_keyword`; 404 when
-none) — complementing the existing per-section `?keyword=` filter. `GET /graph` renders the semantic
+none) — complementing the existing per-section `?keyword=` filter.
+`GET /timeline` renders the 收藏编年史 — all items as a month-grouped
+reverse-chronological vertical timeline (galaxy-colored dot + title link + hook),
+with a stats header (总数/跨度/最活跃星系) and color legend; pure data from the
+derived DB (`timeline.load_timeline`), no LLM, friendly empty state. `GET /graph` renders the semantic
 knowledge graph as a 3D Three.js wireframe-globe (nodes placed on the sphere
 surface by PCA of embeddings, colored by theme galaxy with floating galaxy labels
   + a color legend, glowing arcs for edges, alias labels; OrbitControls

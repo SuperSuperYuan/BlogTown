@@ -43,6 +43,7 @@ from aishelf.site import (
     schedule_state,
     scheduler,
     schedules,
+    timeline,
     views,
 )
 from aishelf.site import digest as digest_mod
@@ -370,6 +371,12 @@ def keywords_page(request: Request):
     return templates.TemplateResponse(
         request, "keywords.html", {"tags": tags, "max_count": max_count}
     )
+
+
+@app.get("/timeline", response_class=HTMLResponse)
+def timeline_page(request: Request):
+    data = timeline.load_timeline(default_db_path(get_data_dir()))
+    return templates.TemplateResponse(request, "timeline.html", {"data": data})
 
 
 @app.get("/search", response_class=HTMLResponse)

@@ -314,3 +314,16 @@ main:has(.write) { max-width: 1280px; }
 .kw-cloud .tagcloud a { color: #cdd3da; text-decoration: none; }
 .kw-cloud .tagcloud a:hover { color: #8ab4ff; }
 .kw-cloud .tc-count { font-size: .55em; color: #8a8f98; margin-left: .12em; vertical-align: super; }
+
+.timeline h1 .hint { font-size: .5em; font-weight: 400; color: #8a8f98; margin-left: .5em; }
+.timeline .tl-stats { color: #9aa5b1; font-size: 14px; margin: 6px 0 22px; }
+.timeline .tl-month { font-size: 15px; color: #cdd3da; border-bottom: 1px solid #2a2f37; padding-bottom: 6px; margin: 26px 0 10px; }
+.timeline .tl-count { font-size: .75em; color: #8a8f98; margin-left: .4em; }
+.timeline .tl-list { list-style: none; padding: 0; margin: 0; }
+.timeline .tl-list li { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; }
+.timeline .tl-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.timeline .tl-title { color: #cdd3da; text-decoration: none; }
+.timeline .tl-title:hover { color: #8ab4ff; }
+.timeline .tl-hook { color: #7b8794; font-size: 13px; }
+.timeline .tl-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; padding-top: 14px; border-top: 1px solid #2a2f37; }
+.timeline .tl-leg { display: inline-flex; align-items: center; gap: 6px; color: #9aa5b1; font-size: 13px; }
