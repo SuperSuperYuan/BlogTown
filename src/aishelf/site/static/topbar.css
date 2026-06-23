@@ -10,6 +10,35 @@
 .topbar .search input { padding: 7px 10px; border: none; border-radius: 8px; width: 240px; }
 .topbar .search button { padding: 7px 14px; border: none; border-radius: 8px; background: #0a84ff; color: #fff; cursor: pointer; }
 .topbar .search button:hover { background: #0070e0; }
+
+/* 「玩法」下拉：图谱/碰撞/镜子/路线/标签/编年史/孤岛 — 深空风，呼应这些页面 */
+.topbar .nav-menu { position: relative; display: inline-block; }
+.topbar .nav-menu > summary {
+  list-style: none; cursor: pointer; user-select: none; color: #cbd2d9; margin-right: 14px;
+  display: inline-flex; align-items: center; gap: 4px; transition: color .12s;
+}
+.topbar .nav-menu > summary::-webkit-details-marker { display: none; }
+.topbar .nav-menu > summary::after { content: "▾"; font-size: 10px; opacity: .75; transition: transform .15s; }
+.topbar .nav-menu > summary:hover, .topbar .nav-menu[open] > summary { color: #fff; }
+.topbar .nav-menu[open] > summary::after { transform: rotate(180deg); opacity: 1; }
+.topbar .nav-pop {
+  position: absolute; top: calc(100% + 12px); left: -8px; z-index: 30;
+  display: grid; min-width: 132px; padding: 7px;
+  background: radial-gradient(120% 80% at 80% 0%, rgba(76,194,255,.1), transparent 60%), #11151f;
+  border: 1px solid rgba(138,180,255,.2); border-radius: 13px;
+  box-shadow: 0 16px 38px rgba(0,0,0,.5), 0 0 0 1px rgba(8,11,22,.6);
+}
+.topbar .nav-pop::before {
+  content: ""; position: absolute; top: -5px; left: 22px; width: 9px; height: 9px;
+  background: #11151f; border-left: 1px solid rgba(138,180,255,.2); border-top: 1px solid rgba(138,180,255,.2);
+  transform: rotate(45deg);
+}
+.topbar .nav-pop a {
+  margin: 0; padding: 7px 13px; border-radius: 8px; color: #cbd2d9; font-size: 14px;
+  white-space: nowrap; transition: background .12s, color .12s;
+}
+.topbar .nav-pop a:hover { background: rgba(122,160,255,.14); color: #fff; }
+
 @media (max-width: 920px) {
   .topbar .search input { width: 140px; }
 }
