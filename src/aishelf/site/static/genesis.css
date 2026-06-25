@@ -100,3 +100,30 @@ main:has(.genesis) { max-width: none; padding: 0; }
   color: var(--c);
   opacity: .85;
 }
+
+/* ============================================================
+   星球场 — gx-field, gx-planet, gx-orb, gx-pname
+   漂浮视差 — gx-depth-0/1
+   流星 — gx-meteor
+   ============================================================ */
+.gx-field{ position:absolute; inset:0; z-index:2; }
+.gx-planet{ position:absolute; transform:translate(-50%,-50%); border:none; background:none; cursor:pointer; padding:0;
+  width:calc(46px * var(--s)); height:calc(46px * var(--s)); }
+.gx-orb{ display:block; width:100%; height:100%; border-radius:50%;
+  background: radial-gradient(circle at 32% 30%, hsl(var(--hue) 90% 80%), hsl(var(--hue) 70% 50%) 55%, hsl(var(--hue) 60% 22%) 100%);
+  box-shadow: 0 0 16px -2px hsl(var(--hue) 80% 60% / .7); transition: transform .2s, box-shadow .2s; }
+.gx-pname{ position:absolute; left:50%; top:108%; transform:translateX(-50%); white-space:nowrap;
+  font-size:12px; color:#cdd9f2; opacity:0; transition:opacity .18s; pointer-events:none; }
+.gx-planet:hover .gx-orb, .gx-planet:focus-visible .gx-orb{ transform:scale(1.12); box-shadow:0 0 26px 0 hsl(var(--hue) 85% 65% / .85); }
+.gx-planet:hover .gx-pname, .gx-planet:focus-visible .gx-pname{ opacity:1; }
+/* 视差漂浮:前景快、后景慢 */
+.gx-depth-0{ animation: gx-drift-a calc(16s + var(--i) * 1s) ease-in-out infinite alternate; }
+.gx-depth-1{ animation: gx-drift-b calc(26s + var(--i) * 1s) ease-in-out infinite alternate; opacity:.8; filter:saturate(.85); }
+@keyframes gx-drift-a{ from{margin:0 0} to{margin:-14px 10px} }
+@keyframes gx-drift-b{ from{margin:0 0} to{margin:10px -8px} }
+/* 流星 */
+.gx-meteor{ position:absolute; width:120px; height:2px; z-index:1; pointer-events:none;
+  background:linear-gradient(90deg, transparent, #fff); transform:rotate(18deg); opacity:0;
+  animation: gx-shoot 1.3s ease-out forwards; }
+@keyframes gx-shoot{ 0%{opacity:0;transform:translate(0,0) rotate(18deg)} 12%{opacity:.9} 100%{opacity:0; transform:translate(-320px,120px) rotate(18deg)} }
+@media (prefers-reduced-motion: reduce){ .gx-depth-0,.gx-depth-1{ animation:none } }
