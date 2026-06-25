@@ -1,0 +1,5 @@
+main:has(.genesis) { max-width: none; padding: 0; }
+.genesis { position: relative; min-height: calc(100dvh - 56px); background: #080b16; color: #e6ebf5; overflow: hidden; }
+.genesis .eyebrow { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: .28em; color: #c9a86a; margin: 0 0 4px; text-transform: uppercase; }
+.genesis h1 { margin: 0; font-size: 30px; font-weight: 800; background: linear-gradient(100deg, #fff 8%, #f0dca0 55%, #c9a86a 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.gx-title { position: absolute; top: 18px; left: 0; right: 0; text-align: center; z-index: 5; }

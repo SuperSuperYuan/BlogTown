@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}创世 · Atlas{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/genesis.css" />{% endblock %}
+{% block content %}
+<section class="genesis" id="genesis">
+  <div class="gx-meander gx-m-tl"></div><div class="gx-meander gx-m-tr"></div>
+  <div class="gx-meander gx-m-bl"></div><div class="gx-meander gx-m-br"></div>
+
+  <header class="gx-title">
+    <p class="eyebrow">COSMOGONY · 四因创世</p>
+    <h1>创世</h1>
+  </header>
+
+  <div class="gx-god gx-tl" data-phase="0" aria-label="卡俄斯 Chaos · 质料因 · 规则层"></div>
+  <div class="gx-god gx-tr" data-phase="1" aria-label="盖亚 Gaia · 形式因 · 实体层"></div>
+  <div class="gx-god gx-bl" data-phase="2" aria-label="厄洛斯 Eros · 动力因 · 关系层"></div>
+  <div class="gx-god gx-br" data-phase="3" aria-label="谟涅摩绪涅 Mnemosyne · 目的因 · 事件层"></div>
+
+  <div class="gx-field" id="gx-field"></div>
+
+  <div class="gx-stage" id="gx-stage" data-phase="0" hidden>
+    <div class="gx-globe" id="gx-globe">
+      <div class="gx-layer gx-layer-rule"></div>
+      <div class="gx-layer gx-layer-entity"></div>
+      <div class="gx-layer gx-layer-relation"></div>
+      <div class="gx-layer gx-layer-history"></div>
+    </div>
+    <p class="gx-inscription" id="gx-inscription"></p>
+    <div class="gx-pips" id="gx-pips"></div>
+    <div class="gx-legend" id="gx-legend" hidden></div>
+    <div class="gx-controls">
+      <button type="button" id="gx-replay">重放</button>
+      <button type="button" id="gx-skip">跳过</button>
+      <button type="button" id="gx-close" aria-label="关闭">✕</button>
+    </div>
+  </div>
+</section>
+<script src="/static/genesis.js"></script>
+{% endblock %}
