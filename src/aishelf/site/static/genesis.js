@@ -109,7 +109,7 @@
     if (reduce){ ["gx-p1","gx-p2","gx-p3","gx-p4"].forEach(c=>stage.classList.add(c)); gods.forEach(g=>g.classList.add("gx-on")); pips.forEach(p=>p.classList.add("gx-on")); finalize(); return; }
     requestAnimationFrame(() => runFrom(0));
   }
-  function replay(){ resetVisuals(); if (reduce){ openWorld(current); } else { requestAnimationFrame(() => runFrom(0)); } }
+  function replay(){ clearTimers(); resetVisuals(); if (reduce){ openWorld(current); } else { requestAnimationFrame(() => runFrom(0)); } }
   function skip(){ clearTimers(); resetVisuals(); ["gx-p1","gx-p2","gx-p3","gx-p4"].forEach(c=>stage.classList.add(c)); gods.forEach(g=>g.classList.add("gx-on")); pips.forEach(p=>p.classList.add("gx-on")); finalize(); }
   function closeWorld(){ clearTimers(); resetVisuals(); stage.hidden = true; legendEl.hidden = true; root.classList.remove("gx-creating"); current = null; }
 
