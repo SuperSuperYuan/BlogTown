@@ -83,6 +83,14 @@
     root.removeAttribute("data-tint");
   }
 
+  function flash(){
+    if (reduce) return;
+    const f = document.createElement("div");
+    f.className = "gx-flash";
+    stage.appendChild(f);
+    setTimeout(() => f.remove(), 360);
+  }
+
   function applyPhase(i){
     stage.classList.add("gx-p" + (i + 1));      // 累积:层渐次显现
     const ph = PHASES[i];
@@ -90,6 +98,7 @@
     pips[i].classList.add("gx-on");
     root.setAttribute("data-tint", i);           // 整屏微泛该色（CSS 处理）
     inscription.textContent = ph.cause + " · " + ph.layer + " ——「" + ph.q + "」";
+    flash();
   }
 
   function finalize(){ stage.classList.add("gx-final"); legendEl.hidden = false; inscription.textContent = current ? current.name : ""; }
