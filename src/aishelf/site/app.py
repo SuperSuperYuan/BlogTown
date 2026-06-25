@@ -388,6 +388,11 @@ def islands_page(request: Request):
     return templates.TemplateResponse(request, "islands.html", {"data": data})
 
 
+@app.get("/genesis", response_class=HTMLResponse)
+def genesis(request: Request):
+    return templates.TemplateResponse(request, "genesis.html", {"request": request})
+
+
 @app.get("/search", response_class=HTMLResponse)
 def search_page(request: Request, q: str = "", page: int = 1):
     results = views.search(_items(), q)
