@@ -63,7 +63,7 @@ def test_timeline_empty_state(client, monkeypatch, tmp_path):
     monkeypatch.setenv("AISHELF_DATA_DIR", str(empty))
     r = client.get("/timeline")
     assert r.status_code == 200
-    assert "还没有收藏" in r.text
+    assert "日志还是空白" in r.text
 
 
 def test_topbar_has_timeline_link(client):
