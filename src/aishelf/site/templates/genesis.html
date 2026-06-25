@@ -11,10 +11,110 @@
     <h1>创世</h1>
   </header>
 
-  <div class="gx-god gx-tl" data-phase="0" aria-label="卡俄斯 Chaos · 质料因 · 规则层"></div>
-  <div class="gx-god gx-tr" data-phase="1" aria-label="盖亚 Gaia · 形式因 · 实体层"></div>
-  <div class="gx-god gx-bl" data-phase="2" aria-label="厄洛斯 Eros · 动力因 · 关系层"></div>
-  <div class="gx-god gx-br" data-phase="3" aria-label="谟涅摩绪涅 Mnemosyne · 目的因 · 事件层"></div>
+  <!-- 卡俄斯 Chaos · 质料因 · 规则层 · 向内螺旋汇聚的散乱星群 -->
+  <div class="gx-god gx-tl" data-phase="0" style="--c:#b388ff" aria-label="卡俄斯 Chaos · 质料因 · 规则层">
+    <svg class="gx-constellation" viewBox="0 0 100 100" aria-hidden="true">
+      <polyline class="gx-cl-line" points="8,15 25,8 45,22 20,35 42,48 65,32 58,55 78,68 60,78 50,60"/>
+      <polyline class="gx-cl-line" points="15,72 30,62 50,60 60,78"/>
+      <g class="gx-cl-stars">
+        <circle cx="8"  cy="15" r="1.5"/>
+        <circle cx="25" cy="8"  r="2.0"/>
+        <circle cx="45" cy="22" r="1.4"/>
+        <circle cx="20" cy="35" r="1.8"/>
+        <circle cx="42" cy="48" r="2.2"/>
+        <circle cx="65" cy="32" r="1.5"/>
+        <circle cx="58" cy="55" r="1.7"/>
+        <circle cx="78" cy="68" r="1.3"/>
+        <circle cx="60" cy="78" r="2.0"/>
+        <circle cx="50" cy="60" r="2.5"/>
+        <circle cx="15" cy="72" r="1.4"/>
+        <circle cx="30" cy="62" r="1.6"/>
+      </g>
+    </svg>
+    <div class="gx-god-label"><b>卡俄斯 Chaos</b><span>质料因 · 规则层</span></div>
+  </div>
+
+  <!-- 盖亚 Gaia · 形式因 · 实体层 · 环抱母体/山-球（稳定三角+弧） -->
+  <div class="gx-god gx-tr" data-phase="1" style="--c:#3ee0b0" aria-label="盖亚 Gaia · 形式因 · 实体层">
+    <svg class="gx-constellation" viewBox="0 0 100 100" aria-hidden="true">
+      <!-- 稳定大三角 -->
+      <polyline class="gx-cl-line" points="50,12 82,72 18,72 50,12"/>
+      <!-- 顶部弧形（天穹） -->
+      <path class="gx-cl-line" d="M20,50 Q50,5 80,50" fill="none"/>
+      <!-- 底部弧形（大地） -->
+      <path class="gx-cl-line" d="M18,72 Q50,90 82,72" fill="none"/>
+      <g class="gx-cl-stars">
+        <circle cx="50" cy="12" r="2.2"/>
+        <circle cx="82" cy="72" r="1.8"/>
+        <circle cx="18" cy="72" r="1.8"/>
+        <circle cx="35" cy="42" r="1.5"/>
+        <circle cx="65" cy="42" r="1.5"/>
+        <circle cx="50" cy="62" r="2.0"/>
+        <circle cx="30" cy="72" r="1.3"/>
+        <circle cx="70" cy="72" r="1.3"/>
+        <circle cx="50" cy="82" r="1.6"/>
+        <circle cx="20" cy="50" r="1.4"/>
+        <circle cx="80" cy="50" r="1.4"/>
+      </g>
+    </svg>
+    <div class="gx-god-label"><b>盖亚 Gaia</b><span>形式因 · 实体层</span></div>
+  </div>
+
+  <!-- 厄洛斯 Eros · 动力因 · 关系层 · 展翼/交缠双弧（对称V+弧） -->
+  <div class="gx-god gx-bl" data-phase="2" style="--c:#ff6b9d" aria-label="厄洛斯 Eros · 动力因 · 关系层">
+    <svg class="gx-constellation" viewBox="0 0 100 100" aria-hidden="true">
+      <!-- 对称V形翅膀骨架 -->
+      <polyline class="gx-cl-line" points="10,20 30,55 50,45 70,55 90,20"/>
+      <!-- 左翼弧 -->
+      <path class="gx-cl-line" d="M10,20 Q20,40 30,55" fill="none"/>
+      <!-- 右翼弧 -->
+      <path class="gx-cl-line" d="M90,20 Q80,40 70,55" fill="none"/>
+      <!-- 中心箭头向下 -->
+      <polyline class="gx-cl-line" points="50,45 50,80"/>
+      <!-- 两条交缠的细弧 -->
+      <path class="gx-cl-line" d="M35,65 Q50,58 65,65" fill="none"/>
+      <path class="gx-cl-line" d="M35,75 Q50,68 65,75" fill="none"/>
+      <g class="gx-cl-stars">
+        <circle cx="10" cy="20" r="1.6"/>
+        <circle cx="90" cy="20" r="1.6"/>
+        <circle cx="30" cy="55" r="1.8"/>
+        <circle cx="70" cy="55" r="1.8"/>
+        <circle cx="50" cy="45" r="2.2"/>
+        <circle cx="20" cy="36" r="1.3"/>
+        <circle cx="80" cy="36" r="1.3"/>
+        <circle cx="50" cy="80" r="1.8"/>
+        <circle cx="35" cy="65" r="1.4"/>
+        <circle cx="65" cy="65" r="1.4"/>
+        <circle cx="35" cy="75" r="1.2"/>
+        <circle cx="65" cy="75" r="1.2"/>
+      </g>
+    </svg>
+    <div class="gx-god-label"><b>厄洛斯 Eros</b><span>动力因 · 关系层</span></div>
+  </div>
+
+  <!-- 谟涅摩绪涅 Mnemosyne · 目的/意义因 · 事件层 · 单臂螺旋（记忆） -->
+  <div class="gx-god gx-br" data-phase="3" style="--c:#ffd166" aria-label="谟涅摩绪涅 Mnemosyne · 目的/意义因 · 事件层">
+    <svg class="gx-constellation" viewBox="0 0 100 100" aria-hidden="true">
+      <!-- 单臂螺旋从外向中心收拢 -->
+      <polyline class="gx-cl-line" points="88,20 72,18 58,28 48,42 46,56 52,68 62,74 74,72 80,62 78,50 68,42 56,40 48,46"/>
+      <g class="gx-cl-stars">
+        <circle cx="88" cy="20" r="1.4"/>
+        <circle cx="72" cy="18" r="1.8"/>
+        <circle cx="58" cy="28" r="1.5"/>
+        <circle cx="48" cy="42" r="1.7"/>
+        <circle cx="46" cy="56" r="1.9"/>
+        <circle cx="52" cy="68" r="1.5"/>
+        <circle cx="62" cy="74" r="2.0"/>
+        <circle cx="74" cy="72" r="1.6"/>
+        <circle cx="80" cy="62" r="1.4"/>
+        <circle cx="78" cy="50" r="1.6"/>
+        <circle cx="68" cy="42" r="1.5"/>
+        <circle cx="56" cy="40" r="1.3"/>
+        <circle cx="48" cy="46" r="2.2"/>
+      </g>
+    </svg>
+    <div class="gx-god-label"><b>谟涅摩绪涅 Mnemosyne</b><span>目的/意义因 · 事件层</span></div>
+  </div>
 
   <div class="gx-field" id="gx-field"></div>
 

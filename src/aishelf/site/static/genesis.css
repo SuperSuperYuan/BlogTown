@@ -3,3 +3,100 @@ main:has(.genesis) { max-width: none; padding: 0; }
 .genesis .eyebrow { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: .28em; color: #c9a86a; margin: 0 0 4px; text-transform: uppercase; }
 .genesis h1 { margin: 0; font-size: 30px; font-weight: 800; background: linear-gradient(100deg, #fff 8%, #f0dca0 55%, #c9a86a 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
 .gx-title { position: absolute; top: 18px; left: 0; right: 0; text-align: center; z-index: 5; }
+
+/* ============================================================
+   场景星尘 — 复用宇宙系列 radial-gradient 星点技巧（呼吸闪烁）
+   ============================================================ */
+.genesis::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(1.4px 1.4px at 6%  12%, #fff, transparent),
+    radial-gradient(1px   1px   at 18% 64%, rgba(255,255,255,.7), transparent),
+    radial-gradient(1.6px 1.6px at 27% 23%, #cfe3ff, transparent),
+    radial-gradient(1px   1px   at 34% 84%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1.3px 1.3px at 42% 38%, #fff, transparent),
+    radial-gradient(1px   1px   at 51% 9%,  rgba(207,227,255,.7), transparent),
+    radial-gradient(1.5px 1.5px at 58% 71%, #fff, transparent),
+    radial-gradient(1px   1px   at 66% 30%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1.6px 1.6px at 73% 88%, #e6d6ff, transparent),
+    radial-gradient(1.2px 1.2px at 81% 18%, #fff, transparent),
+    radial-gradient(1px   1px   at 88% 56%, rgba(255,255,255,.65), transparent),
+    radial-gradient(1.5px 1.5px at 94% 80%, #cfe3ff, transparent),
+    radial-gradient(1px   1px   at 9%  92%, rgba(255,255,255,.5), transparent),
+    radial-gradient(1.3px 1.3px at 46% 96%, #fff, transparent),
+    radial-gradient(1px   1px   at 78% 44%, rgba(255,255,255,.55), transparent);
+  background-repeat: no-repeat;
+  animation: gx-stars 7s ease-in-out infinite;
+}
+@keyframes gx-stars { 0%, 100% { opacity: .55; } 50% { opacity: .95; } }
+@media (prefers-reduced-motion: reduce) { .genesis::before { animation: none; } }
+
+/* ============================================================
+   四角神 — 定位、星座、标签、暖角晕、hover / .gx-on 点亮
+   ============================================================ */
+
+/* 各角一团极淡因之色的径向晕光 */
+.gx-god::before {
+  content: ""; position: absolute; inset: -40px; z-index: -1; pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--c) 18%, transparent) 0%, transparent 70%);
+  opacity: .6;
+  transition: opacity .35s;
+}
+.gx-god:hover::before, .gx-god.gx-on::before { opacity: 1; }
+
+.gx-god {
+  position: absolute;
+  width: 230px;
+  z-index: 4;
+  color: var(--c);
+}
+
+.gx-tl { top: 64px;    left: 26px;  }
+.gx-tr { top: 64px;    right: 26px; text-align: right; }
+.gx-bl { bottom: 46px; left: 26px;  }
+.gx-br { bottom: 46px; right: 26px; text-align: right; }
+
+/* Right-aligned gods: flip the SVG to sit near their outer edge */
+.gx-tr .gx-constellation,
+.gx-br .gx-constellation { margin-left: auto; display: block; }
+
+.gx-constellation {
+  width: 140px; height: 140px;
+  opacity: .45;
+  filter: drop-shadow(0 0 5px var(--c));
+  transition: opacity .25s, filter .25s;
+}
+
+.gx-constellation .gx-cl-stars circle { fill: currentColor; }
+.gx-constellation .gx-cl-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: .7;
+  opacity: .5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* hover 或 已点亮 → 整幅星座亮起 */
+.gx-god:hover .gx-constellation,
+.gx-god.gx-on .gx-constellation {
+  opacity: 1;
+  filter: drop-shadow(0 0 12px var(--c));
+}
+
+.gx-god-label { margin-top: 8px; }
+.gx-god-label b {
+  display: block;
+  color: #e6ebf5;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.gx-god-label span {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--c);
+  opacity: .85;
+}
