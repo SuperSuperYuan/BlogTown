@@ -53,12 +53,75 @@
     setTimeout(shoot, 3000);
   }
 
-  // 前向声明:Task 4 实现，先给安全空壳避免 click 报错
-  let openWorld = function () {};
+  // ── 状态机 ──────────────────────────────────────────────────
+  const PHASES = [
+    { god:"卡俄斯 Chaos",        cause:"质料因",     layer:"规则层", q:"世界由什么构成", color:"#b388ff", corner:"gx-tl" },
+    { god:"盖亚 Gaia",           cause:"形式因",     layer:"实体层", q:"世界如何成形",   color:"#3ee0b0", corner:"gx-tr" },
+    { god:"厄洛斯 Eros",         cause:"动力因",     layer:"关系层", q:"世界为何运转",   color:"#ff6b9d", corner:"gx-bl" },
+    { god:"谟涅摩绪涅 Mnemosyne", cause:"目的/意义因", layer:"事件层", q:"世界留下什么",   color:"#ffd166", corner:"gx-br" },
+  ];
+
+  const root = document.getElementById("genesis");
+  const stage = document.getElementById("gx-stage");
+  const inscription = document.getElementById("gx-inscription");
+  const pipsEl = document.getElementById("gx-pips");
+  const legendEl = document.getElementById("gx-legend");
+  const gods = Array.from(document.querySelectorAll(".gx-god"));
+  let timers = [];
+  let current = null;
+
+  pipsEl.innerHTML = PHASES.map((p,i) => '<span class="gx-pip" data-i="'+i+'" style="--c:'+p.color+'"></span>').join("");
+  legendEl.innerHTML = PHASES.map(p => '<span class="gx-leg" style="--c:'+p.color+'"><i></i>'+p.cause+' · '+p.layer+'</span>').join("");
+  const pips = Array.from(pipsEl.children);
+
+  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+  function resetVisuals(){
+    stage.className = "gx-stage";
+    gods.forEach(g => g.classList.remove("gx-on"));
+    pips.forEach(p => p.classList.remove("gx-on"));
+    inscription.textContent = "";
+    root.removeAttribute("data-tint");
+  }
+
+  function applyPhase(i){
+    stage.classList.add("gx-p" + (i + 1));      // 累积:层渐次显现
+    const ph = PHASES[i];
+    gods.forEach(g => { if (g.classList.contains(ph.corner)) g.classList.add("gx-on"); });
+    pips[i].classList.add("gx-on");
+    root.setAttribute("data-tint", i);           // 整屏微泛该色（CSS 处理）
+    inscription.textContent = ph.cause + " · " + ph.layer + " ——「" + ph.q + "」";
+  }
+
+  function finalize(){ stage.classList.add("gx-final"); legendEl.hidden = false; inscription.textContent = current ? current.name : ""; }
+
+  function runFrom(i){
+    clearTimers();
+    if (i >= PHASES.length){ finalize(); return; }
+    applyPhase(i);
+    timers.push(setTimeout(() => runFrom(i + 1), 1200));   // 每相位 ~1.2s
+  }
+
+  function openWorld(world){
+    current = world;
+    resetVisuals();
+    stage.hidden = false;
+    root.classList.add("gx-creating");           // 标题/星球场淡出由 CSS 处理
+    if (reduce){ ["gx-p1","gx-p2","gx-p3","gx-p4"].forEach(c=>stage.classList.add(c)); gods.forEach(g=>g.classList.add("gx-on")); pips.forEach(p=>p.classList.add("gx-on")); finalize(); return; }
+    requestAnimationFrame(() => runFrom(0));
+  }
+  function replay(){ resetVisuals(); if (reduce){ openWorld(current); } else { requestAnimationFrame(() => runFrom(0)); } }
+  function skip(){ clearTimers(); resetVisuals(); ["gx-p1","gx-p2","gx-p3","gx-p4"].forEach(c=>stage.classList.add(c)); gods.forEach(g=>g.classList.add("gx-on")); pips.forEach(p=>p.classList.add("gx-on")); finalize(); }
+  function closeWorld(){ clearTimers(); resetVisuals(); stage.hidden = true; legendEl.hidden = true; root.classList.remove("gx-creating"); current = null; }
+
+  document.getElementById("gx-replay").addEventListener("click", replay);
+  document.getElementById("gx-skip").addEventListener("click", skip);
+  document.getElementById("gx-close").addEventListener("click", closeWorld);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !stage.hidden) closeWorld(); });
+  stage.addEventListener("click", (e) => { if (e.target === stage) closeWorld(); });  // 点空白关闭
+  // ────────────────────────────────────────────────────────────
 
   renderField();
   initAmbient();
 
-  // 暴露给 Task 4 覆盖
-  window.__genesis = { setOpenWorld(fn) { openWorld = fn; }, WORLDS };
+  window.__genesis = { WORLDS, openWorld, PHASES };
 })();

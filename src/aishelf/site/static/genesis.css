@@ -127,3 +127,55 @@ main:has(.genesis) { max-width: none; padding: 0; }
   animation: gx-shoot 1.3s ease-out forwards; }
 @keyframes gx-shoot{ 0%{opacity:0;transform:translate(0,0) rotate(18deg)} 12%{opacity:.9} 100%{opacity:0; transform:translate(-320px,120px) rotate(18deg)} }
 @media (prefers-reduced-motion: reduce){ .gx-depth-0,.gx-depth-1{ animation:none } }
+
+/* ============================================================
+   Task 4: 创世 stage / globe / 四层 / 铭文 / 控件
+   ============================================================ */
+.gx-stage{ position:absolute; inset:0; z-index:8; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; background:radial-gradient(60% 60% at 50% 45%, rgba(8,11,22,.55), rgba(8,11,22,.92)); }
+.gx-stage[hidden]{ display:none; }
+/* 标题/星球场在创世时淡出退后 */
+.gx-creating .gx-title{ opacity:0; transform:translateY(-10px); transition:.5s; }
+.gx-creating .gx-field{ opacity:.12; filter:blur(2px); transition:.6s; pointer-events:none; }
+/* 球与四层 */
+.gx-globe{ position:relative; width:300px; height:300px; border-radius:50%; }
+.gx-layer{ position:absolute; inset:0; border-radius:50%; opacity:0; transition:opacity .6s; }
+.gx-layer-rule{ background:
+  repeating-linear-gradient(0deg, transparent 0 14px, rgba(179,136,255,.5) 14px 15px),
+  repeating-linear-gradient(90deg, transparent 0 14px, rgba(179,136,255,.5) 14px 15px);
+  -webkit-mask:radial-gradient(circle, #000 99%, transparent 100%); mask:radial-gradient(circle, #000 99%, transparent 100%);
+  box-shadow:inset 0 0 30px rgba(179,136,255,.5); }
+.gx-layer-entity{ background:radial-gradient(circle at 50% 50%, rgba(62,224,176,.18), transparent 70%);
+  box-shadow:inset 0 0 0 1px rgba(62,224,176,.4); }
+.gx-layer-entity::before{ content:""; position:absolute; inset:0; border-radius:50%;
+  background-image:radial-gradient(2px 2px at 30% 40%, #3ee0b0, transparent), radial-gradient(2px 2px at 64% 30%, #3ee0b0, transparent), radial-gradient(2px 2px at 50% 66%, #3ee0b0, transparent), radial-gradient(2px 2px at 40% 60%, #3ee0b0, transparent), radial-gradient(2px 2px at 70% 58%, #3ee0b0, transparent); }
+.gx-layer-relation{ background:conic-gradient(from 0deg, transparent, rgba(255,107,157,.25), transparent 40%);
+  box-shadow:inset 0 0 24px rgba(255,107,157,.4); }
+.gx-layer-history{ box-shadow:0 0 0 2px rgba(255,209,102,.5), 0 0 26px rgba(255,209,102,.5);
+  background:conic-gradient(rgba(255,209,102,.0) 0 70%, rgba(255,209,102,.35) 78%, rgba(255,209,102,0) 86%); }
+/* 累积显现 + 关系层旋转 */
+.gx-stage.gx-p1 .gx-layer-rule{ opacity:1; }
+.gx-stage.gx-p2 .gx-layer-entity{ opacity:1; }
+.gx-stage.gx-p3 .gx-layer-relation{ opacity:1; animation:gx-spin 8s linear infinite; }
+.gx-stage.gx-p4 .gx-layer-history{ opacity:1; animation:gx-spin 22s linear infinite reverse; }
+@keyframes gx-spin{ to{ transform:rotate(360deg) } }
+/* 铭文 */
+.gx-inscription{ margin-top:30px; min-height:1.4em; color:#f0dca0; letter-spacing:.14em; font-size:15px;
+  border-bottom:1px solid rgba(201,168,106,.4); padding-bottom:8px; }
+/* 进度点 */
+.gx-pips{ display:flex; gap:10px; margin-top:18px; }
+.gx-pip{ width:9px; height:9px; border-radius:50%; border:1px solid var(--c); opacity:.4; transition:.3s; }
+.gx-pip.gx-on{ background:var(--c); opacity:1; box-shadow:0 0 10px var(--c); }
+/* 图例 + 控件 */
+.gx-legend{ display:flex; gap:14px; margin-top:16px; font-size:12px; color:#9aa5bf; }
+.gx-leg i{ display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--c); margin-right:5px; box-shadow:0 0 8px var(--c); }
+.gx-controls{ position:absolute; right:22px; bottom:22px; display:flex; gap:10px; }
+.gx-controls button{ background:rgba(122,160,255,.08); border:1px solid rgba(201,168,106,.4); color:#e6ebf5;
+  border-radius:9px; padding:.4rem .9rem; cursor:pointer; font:inherit; }
+.gx-controls button:hover{ border-color:#c9a86a; }
+/* 整屏相位泛色 */
+.genesis[data-tint="0"] .gx-stage{ box-shadow:inset 0 0 220px rgba(179,136,255,.18); }
+.genesis[data-tint="1"] .gx-stage{ box-shadow:inset 0 0 220px rgba(62,224,176,.16); }
+.genesis[data-tint="2"] .gx-stage{ box-shadow:inset 0 0 220px rgba(255,107,157,.16); }
+.genesis[data-tint="3"] .gx-stage{ box-shadow:inset 0 0 220px rgba(255,209,102,.16); }
+@media (prefers-reduced-motion: reduce){ .gx-layer{ transition:none } .gx-stage.gx-p3 .gx-layer-relation,.gx-stage.gx-p4 .gx-layer-history{ animation:none } }
